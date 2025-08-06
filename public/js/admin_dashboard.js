@@ -1308,4 +1308,3 @@ if (menuToggle && sidebar) {
 } else {
     console.error("Sidebar or menu toggle button not found in the DOM.");
 }
-});
