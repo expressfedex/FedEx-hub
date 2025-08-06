@@ -1,70 +1,55 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Materialize components
+    // This is the opening of the listener. All your code should go inside this block.
+
+    // 1. Initialize Materialize components
     M.Sidenav.init(document.querySelectorAll('.sidenav'));
     M.Modal.init(document.querySelectorAll('.modal'));
     M.FormSelect.init(document.querySelectorAll('select'));
     M.Datepicker.init(document.querySelectorAll('.datepicker'));
-    // Make sure to match the IDs in your HTML for CharacterCounter
     M.CharacterCounter.init(document.querySelectorAll('textarea#newHistoryDescription, textarea#editHistoryDescription, textarea#notificationMessage'));
 
-    // --- Navigation Logic ---
+    // 2. Navigation Logic
     const sidebarLinks = document.querySelectorAll('.sidebar a');
     const contentSections = document.querySelectorAll('.dashboard-section');
 
     function showSection(sectionId) {
-        // Hide all sections first
         contentSections.forEach(section => {
             section.classList.remove('active-section');
-            // An alternative approach if a class isn't used
-            // section.style.display = 'none'; 
         });
-
-        // Show the target section
         const targetSection = document.getElementById(sectionId);
         if (targetSection) {
             targetSection.classList.add('active-section');
-            // Or if using the alternative approach
-            // targetSection.style.display = 'block';
         } else {
             console.error(`Section with ID "${sectionId}" not found.`);
         }
     }
 
-    // Set up the click event listener for all sidebar links
     sidebarLinks.forEach(link => {
         link.addEventListener('click', function(e) {
-            e.preventDefault(); // Stop the default anchor link behavior
+            e.preventDefault();
             const sectionId = this.getAttribute('data-section');
-            
             showSection(sectionId);
-
-            // Update the active class on the sidebar links
             sidebarLinks.forEach(item => item.parentElement.classList.remove('active'));
             this.parentElement.classList.add('active');
             
-            // --- Fetch data relevant to the section being shown ---
-            // These functions are assumed to be defined elsewhere in your file
             if (sectionId === 'dashboard-section' || sectionId === 'all-trackings-section') {
-                fetchAllTrackings(); 
+                fetchAllTrackings();
             } else if (sectionId === 'manage-tracking-section') {
-                fetchAllTrackingsForSelect(); // Populate the dropdown for single tracking management
+                fetchAllTrackingsForSelect();
             } else if (sectionId === 'communication-center-section') {
                 fetchTrackingIdsForEmailSelect();
                 fetchTrackingIdsForAttachFileSelect();
             }
-            // Add conditions for other sections as needed
         });
     });
 
-    // Make sure the initial active section is shown on page load
     const initialActiveLink = document.querySelector('.sidebar li.active a');
     if (initialActiveLink) {
         const initialTargetId = initialActiveLink.getAttribute('data-section');
         showSection(initialTargetId);
     }
-});
-
-    // --- Logout Logic ---
+    
+    // 3. Logout Logic
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', function() {
@@ -78,22 +63,26 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error("Logout button not found in the DOM.");
     }
-
-    // --- Sidebar Toggle Logic ---
+    
+    // 4. Sidebar Toggle Logic
+    // We declare these consts once inside the main DOMContentLoaded function
     const sidebar = document.querySelector('.sidebar');
     const menuToggle = document.querySelector('.menu-toggle');
 
     if (menuToggle && sidebar) {
         menuToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('active'); // Toggle the 'active' class to show/hide the sidebar
+            sidebar.classList.toggle('active');
         });
     } else {
         console.error("Sidebar or menu toggle button not found in the DOM.");
     }
 
-    // Initial load: show dashboard and fetch all trackings to populate stats
+    // 5. Initial load
     showSection('dashboard-section');
-    fetchAllTrackings(); // This will also call updateDashboardStats
+    fetchAllTrackings();
+
+    // All other functions and event listeners should also be inside here...
+}); // This is the single, final closing brace for the DOMContentLoaded listener.
 
     // --- 1. Manage Tracking Section ---
    const trackingTableBody = document.getElementById('tracking-table-body');
@@ -1306,20 +1295,17 @@ M.Timepicker.init(timepickers, {
         }
     }
 
+// Initial load: show dashboard and fetch all trackings to populate stats
+showSection('dashboard-section');
+fetchAllTrackings(); // This will also call updateDashboardStats
 
-    // Initial load: show dashboard and fetch all trackings to populate stats
-    showSection('dashboard-section');
-    fetchAllTrackings(); // This will also call updateDashboardStats
-
-    // --- Sidebar Toggle Logic ---
-    const sidebar = document.querySelector('.sidebar');
-    const menuToggle = document.querySelector('.menu-toggle');
-
-    if (menuToggle && sidebar) {
-        menuToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('active'); // Toggle the 'active' class to show/hide the sidebar
-        });
-    } else {
-        console.error("Sidebar or menu toggle button not found in the DOM.");
-    }
+// --- Sidebar Toggle Logic ---
+// We've already declared sidebar and menuToggle earlier in the script, so just use them.
+if (menuToggle && sidebar) {
+    menuToggle.addEventListener('click', function() {
+        sidebar.classList.toggle('active'); // Toggle the 'active' class to show/hide the sidebar
+    });
+} else {
+    console.error("Sidebar or menu toggle button not found in the DOM.");
+}
 });
