@@ -4,43 +4,65 @@ document.addEventListener('DOMContentLoaded', function() {
     M.Modal.init(document.querySelectorAll('.modal'));
     M.FormSelect.init(document.querySelectorAll('select'));
     M.Datepicker.init(document.querySelectorAll('.datepicker'));
-    M.CharacterCounter.init(document.querySelectorAll('textarea#newDescription, textarea#editDescription, textarea#notificationMessageInput'));
+    // Make sure to match the IDs in your HTML for CharacterCounter
+    M.CharacterCounter.init(document.querySelectorAll('textarea#newHistoryDescription, textarea#editHistoryDescription, textarea#notificationMessage'));
 
     // --- Navigation Logic ---
+    const sidebarLinks = document.querySelectorAll('.sidebar a');
+    const contentSections = document.querySelectorAll('.dashboard-section');
+
     function showSection(sectionId) {
-        document.querySelectorAll('.dashboard-section').forEach(section => {
-            section.classList.remove('active-section'); // Hide all sections
+        // Hide all sections first
+        contentSections.forEach(section => {
+            section.classList.remove('active-section');
+            // An alternative approach if a class isn't used
+            // section.style.display = 'none'; 
         });
+
+        // Show the target section
         const targetSection = document.getElementById(sectionId);
         if (targetSection) {
-            targetSection.classList.add('active-section'); // Show the selected section
+            targetSection.classList.add('active-section');
+            // Or if using the alternative approach
+            // targetSection.style.display = 'block';
         } else {
             console.error(`Section with ID "${sectionId}" not found.`);
         }
     }
 
-    document.querySelectorAll('.sidebar a').forEach(link => {
+    // Set up the click event listener for all sidebar links
+    sidebarLinks.forEach(link => {
         link.addEventListener('click', function(e) {
-            e.preventDefault();
+            e.preventDefault(); // Stop the default anchor link behavior
             const sectionId = this.getAttribute('data-section');
+            
             showSection(sectionId);
 
-            // Fetch data relevant to the section being shown
-            if (sectionId === 'dashboard-section') {
-                fetchAllTrackings(); // Re-fetch to update dashboard stats
-            } else if (sectionId === 'manage-trackings-section') {
-                fetchAllTrackings();
-            } else if (sectionId === 'send-notifications-section') {
+            // Update the active class on the sidebar links
+            sidebarLinks.forEach(item => item.parentElement.classList.remove('active'));
+            this.parentElement.classList.add('active');
+            
+            // --- Fetch data relevant to the section being shown ---
+            // These functions are assumed to be defined elsewhere in your file
+            if (sectionId === 'dashboard-section' || sectionId === 'all-trackings-section') {
+                fetchAllTrackings(); 
+            } else if (sectionId === 'manage-tracking-section') {
+                fetchAllTrackingsForSelect(); // Populate the dropdown for single tracking management
+            } else if (sectionId === 'communication-center-section') {
                 fetchTrackingIdsForEmailSelect();
-            } else if (sectionId === 'manage-files-section') {
                 fetchTrackingIdsForAttachFileSelect();
-            } else if (sectionId === 'manage-users-section') {
-                fetchAllUsers();
-            } else if (sectionId === 'profile-section') {
-                fetchAdminProfile();
             }
+            // Add conditions for other sections as needed
         });
     });
+
+    // Make sure the initial active section is shown on page load
+    const initialActiveLink = document.querySelector('.sidebar li.active a');
+    if (initialActiveLink) {
+        const initialTargetId = initialActiveLink.getAttribute('data-section');
+        showSection(initialTargetId);
+    }
+});
 
     // --- Logout Logic ---
     const logoutBtn = document.getElementById('logout-btn');
