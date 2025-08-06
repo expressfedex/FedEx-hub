@@ -93,7 +93,7 @@ if (!trackingTableBody) {
     const createTrackingModal = document.getElementById('createTrackingModal');
     const addTrackingForm = document.getElementById('addTrackingForm');
     const editTrackingModal = document.getElementById('editTrackingModal');
-    const editTrackingForm = document.getElementById('editTrackingForm');
+    const editTrackingForm = document.getElementById('updateTrackingForm');
     const deleteTrackingModalTrigger = document.getElementById('deleteTrackingModalTrigger');
     const deleteTrackingBtn = document.getElementById('deleteTrackingBtn');
     const trackingIdToDeleteInput = document.getElementById('trackingIdToDelete');
