@@ -77,10 +77,11 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error("Sidebar or menu toggle button not found in the DOM.");
     }
 
-    // 5. Initial load
+    
+   // Initial load: show dashboard and fetch all trackings to populate stats
     showSection('dashboard-section');
-    fetchAllTrackings();
-
+    fetchAllTrackings(); // This will also call updateDashboardStats
+    fetchTrackingIdsForAttachFileSelect(); // Add this line to call the correct function.
     // All other functions and event listeners should also be inside here...
 }); // This is the single, final closing brace for the DOMContentLoaded listener.
 
@@ -1295,10 +1296,10 @@ M.Timepicker.init(timepickers, {
             return 'unknown';
         }
     }
-
 // Initial load: show dashboard and fetch all trackings to populate stats
 showSection('dashboard-section');
-fetchAllTrackings(); // This will also call updateDashboardStats
+fetchAllTrackings(); 
+fetchTrackingIdsForAttachFileSelect(); 
 
 // --- Sidebar Toggle Logic ---
 // We've already declared sidebar and menuToggle earlier in the script, so just use them.
