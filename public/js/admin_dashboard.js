@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (sectionId === 'dashboard-section' || sectionId === 'all-trackings-section') {
                 fetchAllTrackings();
             } else if (sectionId === 'manage-tracking-section') {
-                fetchAllTrackingsForSelect();
+                 fetchAllTrackings();
             } else if (sectionId === 'communication-center-section') {
                 fetchTrackingIdsForEmailSelect();
                 fetchTrackingIdsForAttachFileSelect();
