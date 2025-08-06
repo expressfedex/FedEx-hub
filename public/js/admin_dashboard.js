@@ -193,22 +193,24 @@ if (!trackingTableBody) {
         });
     }
 
-    // Create Tracking
-    createTrackingForm.addEventListener('submit', function(e) {
-        e.preventDefault();
+   // Create Tracking
+const createTrackingForm = document.getElementById('createTrackingForm');
+createTrackingForm.addEventListener('submit', function(e) {
+    e.preventDefault();
 
-        const trackingData = {
-            trackingId: document.getElementById('newTrackingId').value,
-            shipperName: document.getElementById('newShipperName').value,
-            recipientName: document.getElementById('newRecipientName').value,
-            origin: document.getElementById('newOrigin').value,
-            destination: document.getElementById('newDestination').value,
-            currentLocation: document.getElementById('newCurrentLocation').value,
-            expectedDeliveryDate: document.getElementById('newExpectedDeliveryDate').value,
-            status: document.getElementById('newStatus').value,
-            packageDescription: document.getElementById('newDescription').value,
-            packageWeight: parseFloat(document.getElementById('newPackageWeight').value)
-        };
+    const trackingData = {
+        trackingId: document.getElementById('newTrackingId').value,
+        shipperName: document.getElementById('newShipperName').value,
+        recipientName: document.getElementById('newRecipientName').value,
+        origin: document.getElementById('newOrigin').value,
+        destination: document.getElementById('newDestination').value,
+        currentLocation: document.getElementById('newCurrentLocation').value,
+        expectedDeliveryDate: document.getElementById('newExpectedDeliveryDate').value,
+        status: document.getElementById('newStatus').value,
+        packageDescription: document.getElementById('newDescription').value,
+        packageWeight: parseFloat(document.getElementById('newPackageWeight').value)
+    };
+
 
         fetch('/api/admin/trackings', {
                 method: 'POST',
