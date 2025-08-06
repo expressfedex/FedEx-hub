@@ -194,7 +194,7 @@ if (!trackingTableBody) {
     }
 
    // Create Tracking
-const createTrackingForm = document.getElementById('createTrackingForm');
+const addTrackingForm = document.getElementById('addTrackingForm');
 createTrackingForm.addEventListener('submit', function(e) {
     e.preventDefault();
 
