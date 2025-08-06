@@ -85,13 +85,13 @@ document.addEventListener('DOMContentLoaded', function() {
 }); // This is the single, final closing brace for the DOMContentLoaded listener.
 
     // --- 1. Manage Tracking Section ---
-   const trackingTableBody = document.getElementById('tracking-table-body');
+const trackingTableBody = document.getElementById('all-trackings-table-body');
 if (!trackingTableBody) {
     console.error("Tracking table body element not found.");
     // No return needed here
 }
     const createTrackingModal = document.getElementById('createTrackingModal');
-    const createTrackingForm = document.getElementById('createTrackingForm');
+    const addTrackingForm = document.getElementById('addTrackingForm');
     const editTrackingModal = document.getElementById('editTrackingModal');
     const editTrackingForm = document.getElementById('editTrackingForm');
     const deleteTrackingModalTrigger = document.getElementById('deleteTrackingModalTrigger');
