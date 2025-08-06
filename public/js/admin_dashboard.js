@@ -96,11 +96,11 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchAllTrackings(); // This will also call updateDashboardStats
 
     // --- 1. Manage Tracking Section ---
-    const trackingTableBody = document.getElementById('tracking-table-body');
-    if (!trackingTableBody) {
-        console.error("Tracking table body element not found.");
-        return;
-    }
+   const trackingTableBody = document.getElementById('tracking-table-body');
+if (!trackingTableBody) {
+    console.error("Tracking table body element not found.");
+    // No return needed here
+}
     const createTrackingModal = document.getElementById('createTrackingModal');
     const createTrackingForm = document.getElementById('createTrackingForm');
     const editTrackingModal = document.getElementById('editTrackingModal');
