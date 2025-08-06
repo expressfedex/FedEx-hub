@@ -653,7 +653,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Delete User
+    // Delete Users
     if (deleteUserBtn) {
         deleteUserBtn.addEventListener('click', function() {
             const userId = userIdToDeleteInput.value;
