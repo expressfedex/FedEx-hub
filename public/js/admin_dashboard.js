@@ -57,10 +57,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function showSection(sectionId) {
         document.querySelectorAll('.dashboard-section').forEach(section => {
             section.style.display = 'none';
+            section.classList.remove('active-section');
         });
         const activeSection = document.getElementById(sectionId);
         if (activeSection) {
             activeSection.style.display = 'block';
+            activeSection.classList.add('active-section');
         }
     }
 
@@ -321,6 +323,24 @@ document.addEventListener('DOMContentLoaded', function() {
             sidebar.classList.toggle('active');
         });
     }
+
+    // --- New: Sidebar Navigation Logic ---
+    const sidebarLinks = document.querySelectorAll('.sidebar nav ul li a');
+
+    // Add a click listener to each sidebar link
+    sidebarLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevent the default link behavior
+            const targetSection = this.getAttribute('href').substring(1); // Get the section ID from the href
+            
+            // Remove 'active' class from all links and add it to the clicked one
+            sidebarLinks.forEach(item => item.parentElement.classList.remove('active'));
+            this.parentElement.classList.add('active');
+            
+            // Show the corresponding content section
+            showSection(targetSection);
+        });
+    });
 
     // Initial load: show dashboard and fetch all trackings and users
     showSection('dashboard-section');
@@ -653,7 +673,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Delete Users
+    // Delete User
     if (deleteUserBtn) {
         deleteUserBtn.addEventListener('click', function() {
             const userId = userIdToDeleteInput.value;
