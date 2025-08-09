@@ -292,7 +292,7 @@ app.get('/api/admin/trackings', authenticateAdmin, async (req, res) => {
         res.status(500).json({ message: 'Server error while fetching all trackings.', error: error.message });
     }
 });
---------------------------------------------------------------------------------
+
 // Admin Route: Fetch history for a tracking
 app.get('/api/admin/trackings/:trackingIdValue/history', authenticateToken, async (req, res) => {
     try {
@@ -318,7 +318,7 @@ app.get('/api/admin/trackings/:trackingIdValue/history', authenticateToken, asyn
         res.status(500).json({ message: 'Error fetching tracking history.' });
     }
 });
---------------------------------------------------------------------------------
+
 // Admin Route: Get a single tracking record by ID (Corrected to find by custom 'trackingId')
 app.get('/api/admin/trackings/:trackingIdValue', authenticateAdmin, async (req, res) => {
     try {
