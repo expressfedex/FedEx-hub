@@ -1,63 +1,70 @@
-/* General styles */
-body {
-    font-family: 'Roboto', sans-serif; /* Preferred font from second snippet */
-    margin: 0;
-    padding: 0; /* Ensures no default body padding */
-    display: flex; /* This is key for the sidebar-main-content layout */
-    min-height: 100vh;
-    background-color: var(--background-color); /* From second snippet */
-    color: var(--text-color);
-}
-
+/* Custom Properties (CSS Variables) */
 :root {
     --primary-color: #FF6200; /* FedEx Orange */
-    --primary-dark-color: #b04300; /* Darker shade for hover/active */
-    --secondary-color: #4CAF50; /* Example green from second snippet */
-    --accent-color: #FFC107; /* Amber from first snippet - kept for general highlights */
-    --background-color: #f4f7f6; /* Light gray from second snippet */
+    --primary-dark-color: #b04300;
+    --secondary-color: #4CAF50;
+    --accent-color: #FFC107;
+    --background-color: #f4f7f6;
     --text-color: #333;
-    --light-gray: #f4f7f6; /* From first snippet (redundant with background-color but kept for clarity) */
+    --light-gray: #f4f7f6;
     --medium-gray: #ccc;
     --dark-gray: #555;
     --white: #fff;
-    --success-green: #28a745; /* Standard green */
-    --warning-orange: #ffc107; /* Standard orange */
-    --danger-red: #dc3545; /* Standard red */
+    --success-green: #28a745;
+    --warning-orange: #ffc107;
+    --danger-red: #dc3545;
 
-    /* Sidebar specific variables from second snippet, adjusted for consistency */
+    /* Sidebar and Layout Variables */
     --sidebar-width: 250px;
-    --sidebar-bg: #263238; /* Dark grey */
+    --sidebar-bg: #263238;
     --sidebar-text: #eceff1;
     --sidebar-hover: #37474F;
-    --header-height: 64px; /* Used for sticky header if needed */
+    --header-height: 64px;
+
+    /* Base Font Size for Scalability */
+    --base-font-size: 16px;
+}
+
+/* General Styles */
+body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    font-size: var(--base-font-size);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-color);
 }
 
 /* Sidebar */
 .sidebar {
     width: var(--sidebar-width);
-    background-color: var(--sidebar-bg); /* From second snippet */
-    color: var(--sidebar-text); /* From second snippet */
+    background-color: var(--sidebar-bg);
+    color: var(--sidebar-text);
     padding: 20px;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
-    justify-content: space-between; /* Pushes logout to bottom */
-    position: fixed; /* Make it fixed */
+    justify-content: space-between;
+    position: fixed;
     top: 0;
     left: 0;
-    height: 100%; /* Full height */
-    transition: transform 0.3s ease-in-out; /* Smooth transition for hiding/showing */
-    z-index: 999; /* Ensure sidebar is above main content */
+    height: 100%;
+    transition: transform 0.3s ease-in-out;
+    z-index: 999;
 }
 
 /* Initially hide sidebar on small screens */
-@media (max-width: 992px) { /* Breakpoint for sidebars */
+@media (max-width: 992px) {
     .sidebar {
-        transform: translateX(-100%); /* Hide sidebar off-screen to the left */
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.2); /* Add a box shadow for when it slides out */
+        transform: translateX(-100%);
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
     }
-
-    /* When active, slide it into view */
     .sidebar.active {
         transform: translateX(0);
     }
@@ -65,17 +72,17 @@ body {
 
 .sidebar h2 {
     text-align: center;
-    color: var(--white); /* White for heading in dark sidebar */
+    color: var(--white);
     margin-bottom: 30px;
     font-size: 1.8em;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Separator */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding-bottom: 15px;
 }
 
 .sidebar ul {
     list-style: none;
     padding: 0;
-    flex-grow: 1; /* Allows the list to take up available space */
+    flex-grow: 1;
 }
 
 .sidebar ul li {
@@ -83,26 +90,25 @@ body {
 }
 
 .sidebar ul li a {
-    display: block;
-    color: var(--sidebar-text); /* Link color from second snippet */
+    display: flex;
+    align-items: center;
+    color: var(--sidebar-text);
     text-decoration: none;
     padding: 12px 15px;
     border-radius: 5px;
-    transition: background-color 0.3s ease, transform 0.2s ease, color 0.2s ease; /* Added color transition */
-    display: flex;
-    align-items: center;
+    transition: background-color 0.3s ease, transform 0.2s ease, color 0.2s ease;
 }
 
 .sidebar ul li a i {
-    margin-right: 15px; /* Increased margin for icon */
-    font-size: 1.2em; /* Slightly larger icon */
+    margin-right: 15px;
+    font-size: 1.2em;
 }
 
 .sidebar ul li a:hover,
 .sidebar ul li a.active {
-    background-color: var(--sidebar-hover); /* Hover color from second snippet */
-    color: var(--primary-color); /* Highlight color on hover/active */
-    transform: translateX(5px); /* Gentle slide on hover */
+    background-color: var(--sidebar-hover);
+    color: var(--primary-color);
+    transform: translateX(5px);
 }
 
 .logout-section {
@@ -111,13 +117,13 @@ body {
     text-align: center;
 }
 
-.logout-section p { /* Added from second snippet */
+.logout-section p {
     margin: 0 0 10px 0;
     font-size: 0.9em;
 }
 
 .logout-section button {
-    background-color: var(--danger-red); /* Red */
+    background-color: var(--danger-red);
     color: var(--white);
     border: none;
     padding: 10px 20px;
@@ -125,68 +131,64 @@ body {
     cursor: pointer;
     transition: background-color 0.3s ease;
     width: 100%;
-    display: flex; /* For icon alignment */
+    display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1em;
 }
 
 .logout-section button:hover {
-    background-color: #c82333; /* Darker red */
+    background-color: #c82333;
 }
 
-.logout-section button i { /* Added from second snippet */
+.logout-section button i {
     margin-left: 8px;
     font-size: 1.1em;
 }
 
 /* Main Content */
 .main-content {
-    margin-left: var(--sidebar-width); /* Space for fixed sidebar on desktop */
+    margin-left: var(--sidebar-width);
     flex-grow: 1;
-    padding: 30px; /* Kept original padding for content */
-    background-color: var(--background-color); /* From second snippet */
-    overflow-y: auto; /* Enable scrolling for content */
-    transition: margin-left 0.3s ease-in-out; /* Smooth transition when sidebar state changes */
+    padding: 30px;
+    background-color: var(--background-color);
+    overflow-y: auto;
+    transition: margin-left 0.3s ease-in-out;
 }
 
-/* Adjust main content margin when sidebar is active on mobile */
 @media (max-width: 992px) {
     .main-content {
-        margin-left: 0; /* No margin on mobile when sidebar is hidden */
+        margin-left: 0;
     }
 }
 
-.main-content header { /* Specific header rule for main-content */
+.main-content header {
     background-color: var(--white);
-    padding: 20px 30px; /* Kept original padding for header */
+    padding: 20px 30px;
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
     margin-bottom: 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    position: sticky; /* Make header sticky */
+    position: sticky;
     top: 0;
-    z-index: 100; /* Ensure header is above content */
+    z-index: 100;
 }
 
-/* New menu toggle icon */
 .menu-toggle {
-    display: none; /* Hidden by default on desktop */
+    display: none;
     font-size: 1.8em;
     cursor: pointer;
-    color: var(--dark-gray); /* Match text color */
-    margin-right: 20px; /* Space between toggle and title */
+    color: var(--dark-gray);
+    margin-right: 20px;
 }
 
 @media (max-width: 992px) {
     .menu-toggle {
-        display: block; /* Show menu toggle on smaller screens */
+        display: block;
     }
-
     .main-content header {
-        /* When menu-toggle is visible, adjust header layout */
         justify-content: flex-start;
     }
 }
@@ -202,17 +204,13 @@ body {
     color: var(--dark-gray);
 }
 
-
-/* All content sections are hidden by default */
+/* Content Sections */
 .content-section {
     display: none;
 }
-
-/* Only the active content section is displayed */
 .content-section.active {
-    display: block; /* Or 'flex', 'grid' depending on your layout needs for the content */
+    display: block;
 }
-
 
 .dashboard-section {
     background-color: var(--white);
@@ -220,11 +218,6 @@ body {
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
     margin-bottom: 25px;
-    display: none; /* Hidden by default - handled by .content-section */
-}
-
-.dashboard-section.active-section { /* This class seems redundant with .content-section.active */
-    display: block; /* Or flex, grid, etc. based on your layout needs */
 }
 
 .dashboard-section h3 {
@@ -283,7 +276,7 @@ body {
 /* Forms and Inputs */
 form {
     display: grid;
-    grid-template-columns: 1fr; /* Default to single column */
+    grid-template-columns: 1fr;
     gap: 15px;
 }
 
@@ -311,18 +304,15 @@ form select {
     border: 1px solid var(--medium-gray);
     border-radius: 5px;
     font-size: 1em;
-    box-sizing: border-box; /* Include padding in width */
+    box-sizing: border-box;
 }
 
-form input[type="text"]:focus,
-form input[type="email"]:focus,
-form input[type="date"]:focus,
-form input[type="time"]:focus,
+form input:focus,
 form textarea:focus,
 form select:focus {
     border-color: var(--primary-color);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(255, 98, 0, 0.2); /* Using primary-color for focus shadow */
+    box-shadow: 0 0 0 2px rgba(255, 98, 0, 0.2);
 }
 
 form textarea {
@@ -344,13 +334,13 @@ form button[type="submit"] {
 
 form button.btn-primary:hover,
 form button[type="submit"]:hover {
-    background-color: var(--primary-dark-color); /* Darker shade of primary */
+    background-color: var(--primary-dark-color);
     transform: translateY(-2px);
 }
 
 form button.btn-danger {
     background-color: var(--danger-red);
-    margin-left: 10px; /* Space out from submit button */
+    margin-left: 10px;
 }
 
 form button.btn-danger:hover {
@@ -370,9 +360,8 @@ form button.btn-danger:hover {
     height: 15px;
     border-radius: 50%;
     display: inline-block;
-    margin-left: 5px;
     vertical-align: middle;
-    border: 1px solid #ccc; /* Default border */
+    border: 1px solid #ccc;
 }
 
 .status-circle.delivered {
@@ -381,7 +370,7 @@ form button.btn-danger:hover {
 }
 
 .status-circle.in-transit {
-    background-color: #007bff; /* Specific blue for in-transit */
+    background-color: #007bff;
     border-color: #007bff;
 }
 
@@ -395,7 +384,6 @@ form button.btn-danger:hover {
     border-color: var(--danger-red);
 }
 
-/* Blinking animation */
 @keyframes blink {
     0% { opacity: 1; }
     50% { opacity: 0.2; }
@@ -451,7 +439,7 @@ form button.btn-danger:hover {
     color: var(--dark-gray);
 }
 
-.edit-history-btn, /* Added edit button styling */
+.edit-history-btn,
 .delete-history-btn {
     background-color: var(--danger-red);
     color: var(--white);
@@ -461,16 +449,16 @@ form button.btn-danger:hover {
     cursor: pointer;
     font-size: 0.8em;
     transition: background-color 0.2s ease;
-    margin-left: 5px; /* Space between buttons */
+    margin-left: 5px;
 }
 
 .edit-history-btn {
-    background-color: var(--primary-color); /* Or blue color */
+    background-color: var(--primary-color);
 }
+
 .edit-history-btn:hover {
     background-color: var(--primary-dark-color);
 }
-
 
 .delete-history-btn:hover {
     background-color: #c82333;
@@ -500,7 +488,7 @@ form button.btn-danger:hover {
     background-color: var(--primary-color);
     color: var(--white);
     font-weight: bold;
-    white-space: nowrap; /* Prevent headers from wrapping */
+    white-space: nowrap;
 }
 
 .data-table tr:nth-child(even) {
@@ -522,7 +510,7 @@ form button.btn-danger:hover {
 
 .data-table .editable-field:focus {
     border-color: var(--secondary-color);
-    background-color: #e6f7ff; /* Light blue background on focus */
+    background-color: #e6f7ff;
 }
 
 .data-table .btn-sm {
@@ -568,134 +556,115 @@ form button.btn-danger:hover {
     border-radius: 5px;
 }
 
-
-/* Modal Styles (for custom modal, since Materialize is removed) */
+/* Modal Styles */
 .modal {
-    display: none; /* Hidden by default */
-    position: fixed; /* Stay in place */
-    z-index: 1000; /* Sit on top */
+    display: none;
+    position: fixed;
+    z-index: 1000;
     left: 0;
     top: 0;
-    width: 100%; /* Full width */
-    height: 100%; /* Full height */
-    overflow: auto; /* Enable scroll if needed */
-    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-    justify-content: center; /* Center horizontally */
-    align-items: center; /* Center vertically */
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+    justify-content: center;
+    align-items: center;
 }
 
 .modal.active {
-    display: flex; /* Show when active */
+    display: flex;
 }
 
 .modal-content {
     background-color: #fefefe;
-    margin: auto; /* Centered */
     padding: 20px;
     border: 1px solid #888;
-    width: 80%; /* Could be responsive */
+    width: 90%;
     max-width: 600px;
     border-radius: 8px;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    position: relative; /* For close button positioning */
+    position: relative;
 }
 
 .modal-close-btn {
     color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
     position: absolute;
     top: 10px;
     right: 20px;
+    font-size: 28px;
+    font-weight: bold;
     cursor: pointer;
 }
 
 .modal-close-btn:hover,
 .modal-close-btn:focus {
     color: #000;
-    text-decoration: none;
-    cursor: pointer;
 }
 
-/* Responsive adjustments */
+/* Responsive adjustments for smaller screens */
 @media (max-width: 768px) {
-    body {
-        flex-direction: column; /* Stack sidebar and main content */
+    :root {
+        --base-font-size: 14px; /* Smaller base font size on mobile */
     }
 
-    /* Sidebar is now fixed and slides out */
+    body {
+        flex-direction: column;
+    }
+
     .sidebar {
-        width: 220px; /* Slightly smaller width on mobile */
+        width: 220px;
         padding: 15px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Original shadow for consistency */
     }
 
     .sidebar h2 {
-        margin-bottom: 20px;
-    }
-
-    .sidebar ul {
-        /* On small screens, list items might be stacked or flow differently */
-        display: block; /* Revert to block flow */
-    }
-
-    .sidebar ul li {
-        margin-bottom: 5px;
-    }
-
-    .sidebar ul li a {
-        padding: 10px;
-        font-size: 0.9em;
-    }
-
-    .sidebar ul li a i {
-        margin-right: 5px;
+        font-size: 1.5em;
     }
 
     .main-content {
-        padding: 20px;
-        margin-left: 0; /* Important: remove margin when sidebar is hidden on mobile */
+        padding: 15px;
+        margin-left: 0;
     }
 
     .main-content header {
         flex-direction: column;
         align-items: flex-start;
-        padding: 15px 20px;
-        margin-bottom: 20px;
+        padding: 15px;
     }
 
     .main-content header h1 {
-        margin-bottom: 10px;
         font-size: 1.5em;
+    }
+    
+    .main-content header .user-info {
+        font-size: 0.9em;
     }
 
     .quick-stats {
-        grid-template-columns: 1fr; /* Stack cards on small screens */
+        grid-template-columns: 1fr;
     }
 
     .dashboard-section {
-        padding: 20px;
+        padding: 15px;
     }
-
+    
     .dashboard-section h3 {
-        font-size: 1.4em;
+        font-size: 1.2em;
     }
 
     .form-row {
-        grid-template-columns: 1fr; /* Stack form fields */
+        grid-template-columns: 1fr;
     }
 
     .data-table {
-        font-size: 0.8em; /* Smaller font for tables on small screens */
+        font-size: 0.75em;
     }
-
+    
     .data-table th,
     .data-table td {
         padding: 8px;
     }
 
     .modal-content {
-        width: 95%; /* Wider modal on smaller screens */
+        width: 95%;
+        max-width: none;
     }
 }
