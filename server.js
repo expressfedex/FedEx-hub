@@ -9,7 +9,7 @@ const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const multer = require('multer'); // <--- NEW: Import multer
+const multer = require('multer');
 
 const app = express();
 
@@ -25,15 +25,12 @@ app.use((req, res, next) => {
 });
 
 // --- Multer Setup for file uploads ---
-// Configure storage: using memory storage is often best for Netlify Functions
-// as functions are stateless and don't have a persistent file system.
 const upload = multer({
-    storage: multer.memoryStorage(), // Store the file in memory as a Buffer
+    storage: multer.memoryStorage(),
     limits: {
-        fileSize: 5 * 1024 * 1024, // Limit file size to 5MB (adjust as needed)
+        fileSize: 5 * 1024 * 1024,
     },
     fileFilter: (req, file, cb) => {
-        // Optional: Filter file types
         if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf' || file.mimetype.includes('document')) {
             cb(null, true);
         } else {
@@ -42,16 +39,30 @@ const upload = multer({
     }
 });
 
-// --- Start the Server ---
-// This is where you should place the new code block
-// The server won't start until this line is executed.
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// --- Mongoose Connection ---
+const DB_URI = process.env.MONGODB_URI;
+
+if (!DB_URI) {
+    console.error('CRITICAL ERROR: MONGODB_URI is not defined in environment variables.');
+    // Exit the process if the database URI is not available
+    process.exit(1); 
+}
+
+mongoose.connect(DB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+.then(() => {
+    console.log('Successfully connected to MongoDB.');
+    // You can call your data population function here if needed
+    // populateInitialData();
+})
+.catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
 });
 
 // --- Mongoose Models ---
-// Your schema definitions here...
 const trackingHistorySchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
     location: { type: String, default: '' },
@@ -61,8 +72,8 @@ const trackingHistorySchema = new mongoose.Schema({
 const TrackingSchema = new mongoose.Schema({
     trackingId: { type: String, required: true, unique: true },
     status: { type: String, required: true },
-    statusLineColor: { type: String, default: '#2196F3' }, // Default blue
-    blinkingDotColor: { type: String, default: '#FFFFFF' }, // Default white
+    statusLineColor: { type: String, default: '#2196F3' },
+    blinkingDotColor: { type: String, default: '#FFFFFF' },
     isBlinking: { type: Boolean, default: false },
     origin: { type: String, default: '' },
     destination: { type: String, default: '' },
@@ -74,9 +85,9 @@ const TrackingSchema = new mongoose.Schema({
     serviceType: { type: String, default: '' },
     recipientAddress: { type: String, default: '' },
     specialHandling: { type: String, default: '' },
-    weight: { type: Number, default: 0 }, // in kg or lbs
+    weight: { type: Number, default: 0 },
     history: [trackingHistorySchema],
-    attachedFileName: { type: String, default: null }, // Stores the filename (or reference like S3 key)
+    attachedFileName: { type: String, default: null },
     lastUpdated: { type: Date, default: Date.now }
 });
 
@@ -86,7 +97,6 @@ const UserSchema = new mongoose.Schema({
     role: { type: String, enum: ['user', 'admin'], default: 'admin' }
 });
 
-// Hash password before saving
 UserSchema.pre('save', async function (next) {
     if (this.isModified('password')) {
         this.password = await bcrypt.hash(this.password, 10);
@@ -97,7 +107,7 @@ UserSchema.pre('save', async function (next) {
 const Tracking = mongoose.model('Tracking', TrackingSchema);
 const User = mongoose.model('User', UserSchema, 'users');
 
-// --- Initial Data Population Function (Exported, not automatically run by app.listen) ---
+// --- Initial Data Population Function ---
 async function populateInitialData() {
     try {
         const existingTracking = await Tracking.findOne({ trackingId: '7770947003939' });
@@ -190,21 +200,44 @@ const authenticateAdmin = (req, res, next) => {
     });
 };
 
+// --- Helper function to parse time including AM/PM
+function parseTimeWithAmPm(timeString) {
+    const timeRegex24 = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
+    const timeRegex12 = /^([0]?[1-9]|1[0-2]):([0-5][0-9])\s*([APap][Mm])$/;
+
+    let match24 = timeString.match(timeRegex24);
+    if (match24) {
+        return { hour: parseInt(match24[1], 10), minute: parseInt(match24[2], 10) };
+    }
+
+    let match12 = timeString.match(timeRegex12);
+    if (match12) {
+        let hour = parseInt(match12[1], 10);
+        let minute = parseInt(match12[2], 10);
+        const ampm = match12[3].toLowerCase();
+
+        if (ampm === 'pm' && hour !== 12) {
+            hour += 12;
+        } else if (ampm === 'am' && hour === 12) {
+            hour = 0;
+        }
+        return { hour, minute };
+    }
+
+    return null;
+}
+
 
 // --- API Routes ---
 
 // Public endpoint to get tracking details
-   app.get('/api/track/:trackingId', async (req, res) => {
+app.get('/api/track/:trackingId', async (req, res) => {
     try {
         const trackingId = req.params.trackingId;
-        
-        // --- ADD THIS LINE ---
         const numericId = parseInt(trackingId, 10);
         if (isNaN(numericId)) {
             return res.status(400).json({ message: 'Invalid Tracking ID format.' });
         }
-
-        // Use the numeric ID in the query
         const trackingDetails = await Tracking.findOne({ trackingId: numericId });
 
         if (!trackingDetails) {
@@ -269,14 +302,12 @@ app.get('/api/admin/trackings/:trackingIdValue/history', authenticateToken, asyn
 
         console.log('Backend: Fetching history for trackingIdValue:', trackingIdValue);
         
-        // --- ADD THESE LINES ---
         const numericId = parseInt(trackingIdValue, 10);
         if (isNaN(numericId)) {
             console.log('Backend: Invalid Tracking ID format for history fetch:', trackingIdValue);
             return res.status(400).json({ message: 'Invalid Tracking ID format.' });
         }
 
-        // Use the numeric ID in the query
         const tracking = await Tracking.findOne({ trackingId: numericId });
 
         if (!tracking) {
@@ -295,16 +326,16 @@ app.get('/api/admin/trackings/:trackingIdValue/history', authenticateToken, asyn
 app.get('/api/admin/trackings/:trackingIdValue', authenticateAdmin, async (req, res) => {
     try {
         const { trackingIdValue } = req.params;
-        console.log(`Backend: Received GET /api/admin/trackings/${trackingIdValue} request.`); // This will log the ID received by backend
+        console.log(`Backend: Received GET /api/admin/trackings/${trackingIdValue} request.`);
 
         const tracking = await Tracking.findOne({ trackingId: trackingIdValue });
 
         if (!tracking) {
-            console.log(`Backend: Tracking record not found for custom ID: ${trackingIdValue}`); // This log means the ID wasn't found in DB
-            return res.status(404).json({ message: 'Tracking record not found.' }); // This is the exact message you're seeing
+            console.log(`Backend: Tracking record not found for custom ID: ${trackingIdValue}`);
+            return res.status(404).json({ message: 'Tracking record not found.' });
         }
 
-        res.json(tracking); // Returns the full tracking object
+        res.json(tracking);
     } catch (error) {
         console.error(`Error fetching single tracking ${req.params.trackingIdValue} for admin:`, error);
         res.status(500).json({ message: 'Server error while fetching single tracking details.', error: error.message });
@@ -336,18 +367,11 @@ app.get('/api/admin/dashboard-stats', authenticateAdmin, async (req, res) => {
 });
 
 // POST /admin/trackings - Create a new tracking record (Admin only)
-// Note: This route still expects JSON data, not multipart/form-data.
-// If your 'create new tracking' form also sends files, you'll need multer here too.
 app.post('/api/admin/trackings', authenticateAdmin, async (req, res) => {
     try {
         console.log('Received POST /api/admin/trackings request. Initial req.body:', req.body);
-        console.log('Type of req.body:', typeof req.body);
-        console.log('Is req.rawBody present and type:', req.rawBody ? typeof req.rawBody : 'not present');
-
         let bodyData = req.body;
 
-        // This workaround is for JSON bodies that might arrive as Buffers in serverless.
-        // It's still relevant if this route consistently receives JSON.
         if (bodyData instanceof Buffer) {
             console.log('req.body is a Buffer, attempting to parse it as JSON...');
             try {
@@ -456,37 +480,9 @@ app.post('/api/admin/trackings', authenticateAdmin, async (req, res) => {
 });
 
 
-// Helper function to parse time including AM/PM
-function parseTimeWithAmPm(timeString) {
-    const timeRegex24 = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/; // HH:MM (24-hour)
-    const timeRegex12 = /^([0]?[1-9]|1[0-2]):([0-5][0-9])\s*([APap][Mm])$/; // HH:MM AM/PM
-
-    let match24 = timeString.match(timeRegex24);
-    if (match24) {
-        return { hour: parseInt(match24[1], 10), minute: parseInt(match24[2], 10) };
-    }
-
-    let match12 = timeString.match(timeRegex12);
-    if (match12) {
-        let hour = parseInt(match12[1], 10);
-        let minute = parseInt(match12[2], 10);
-        const ampm = match12[3].toLowerCase();
-
-        if (ampm === 'pm' && hour !== 12) {
-            hour += 12;
-        } else if (ampm === 'am' && hour === 12) {
-            hour = 0; // Midnight (12 AM)
-        }
-        return { hour, minute };
-    }
-
-    return null;
-}
-
 // POST /api/admin/trackings/:trackingIdValue/history - Add a new history event to a tracking (Admin only)
 app.post('/api/admin/trackings/:trackingIdValue/history', authenticateAdmin, async (req, res) => {
     console.log('\n--- Backend: Add History Event Request Received ---');
-    // Changed param name for clarity
     const { trackingIdValue } = req.params;
     console.log('Backend: req.params.trackingIdValue (Tracking ID from URL):', trackingIdValue);
     console.log('Backend: Full req.body received:', req.body);
@@ -521,7 +517,6 @@ app.post('/api/admin/trackings/:trackingIdValue/history', authenticateAdmin, asy
     }
 
     try {
-        // --- CORRECTED LINE: Use findOne with the 'trackingId' field ---
         const tracking = await Tracking.findOne({ trackingId: trackingIdValue });
 
         if (!tracking) {
@@ -568,42 +563,32 @@ app.post('/api/admin/trackings/:trackingIdValue/history', authenticateAdmin, asy
         await tracking.save();
 
         console.log('Backend: History event successfully added to tracking ID:', trackingIdValue);
-        res.status(201).json({ success: true, message: 'History event added successfully!', tracking: tracking.toObject(), newEvent: newHistoryEvent }); // Added success: true
+        res.status(201).json({ success: true, message: 'History event added successfully!', tracking: tracking.toObject(), newEvent: newHistoryEvent });
     } catch (error) {
         console.error('Backend: Uncaught error adding history event:', error);
-        // CastError should no longer occur here for valid trackingIdValue
-        res.status(500).json({ success: false, message: 'Server error while adding history event.', error: error.message }); // Added success: false
+        res.status(500).json({ success: false, message: 'Server error while adding history event.', error: error.message });
     }
 });
 
 // Edit a specific history event
 app.put('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, async (req, res) => {
     const { id, historyId } = req.params;
-    let requestBody = req.body; // Use a temporary variable for req.body initially
+    let requestBody = req.body;
 
-    // --- CRITICAL: MANUAL PARSING LOGIC TO ENSURE req.body IS A PARSED OBJECT ---
-    // (These are the lines that were missing from your previous logs)
     console.log(`Backend: Received PUT request for History ID: ${historyId} on Tracking ID: ${id}`);
-    console.log('Backend: History Data to update (initial req.body):', req.body);
-    console.log('Backend: Type of requestBody (initial):', typeof requestBody);
-    console.log('Backend: Keys of requestBody (initial):', Object.keys(requestBody));
+    console.log('Backend: Data to update (initial req.body):', req.body);
 
     if (Buffer.isBuffer(requestBody)) {
         try {
-            // Convert Buffer to string, then parse as JSON
             const parsedBody = JSON.parse(requestBody.toString('utf8'));
-            requestBody = parsedBody; // Reassign requestBody to the parsed object
+            requestBody = parsedBody;
             console.log('Backend: Manually parsed history body. New requestBody:', requestBody);
-            console.log('Backend: Type of requestBody (after manual parse):', typeof requestBody);
-            console.log('Backend: Keys of requestBody (after manual parse):', Object.keys(requestBody));
         } catch (parseError) {
-            console.error('Backend: Failed to manually parse history body (likely invalid JSON or empty body):', parseError);
+            console.error('Backend: Failed to manually parse history body:', parseError);
             return res.status(400).json({ message: 'Invalid JSON body format or empty request body for history update.' });
         }
     }
-    // -----------------------------------------------------------------------------
 
-    // Now, destructure from the (potentially) parsed requestBody
     const { date, time, location, description } = requestBody;
 
     if (date === undefined && time === undefined && location === undefined && description === undefined) {
@@ -654,7 +639,6 @@ app.put('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, async 
                 parsedTime.hour,
                 parsedTime.minute
             ));
-
             if (isNaN(newTimestamp.getTime())) {
                 console.warn(`Could not parse combined timestamp from admin input: ${effectiveDate} ${effectiveTimeInput}`);
                 return res.status(400).json({ message: 'Invalid date or time provided for history event update.' });
@@ -678,46 +662,26 @@ app.put('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, async 
     }
 });
 
-// Admin Route: Get all users
-app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
-    try {
-        console.log('Received GET /api/admin/users request.');
-        // Fetch all users from the database, but exclude their password for security
-        const users = await User.find({}).select('-password');
-        res.json(users);
-    } catch (error) {
-        console.error('Error fetching all users for admin:', error);
-        res.status(500).json({ message: 'Server error while fetching users.', error: error.message });
-    }
-});
-
 // Admin Route to Update Tracking Details (general updates, including trackingId change)
 app.put('/api/admin/trackings/:id', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
-    let updateData = req.body; // Initialize updateData with the raw req.body
+    let updateData = req.body;
 
-    // --- IMPORTANT: ADD THIS MANUAL PARSING LOGIC HERE ---
     console.log(`Backend: Received PUT request for MongoDB ID: ${id}`);
     console.log('Backend: Data to update (initial req.body):', req.body);
     console.log('Backend: Type of updateData (initial):', typeof updateData);
     console.log('Backend: Keys of updateData (initial):', Object.keys(updateData));
 
-    // Check if req.body is a Buffer (as confirmed by your logs)
     if (Buffer.isBuffer(updateData)) {
         try {
-            // Attempt to parse the Buffer as a JSON string
             const parsedBody = JSON.parse(updateData.toString('utf8'));
-            updateData = parsedBody; // Reassign updateData to the parsed object
+            updateData = parsedBody;
             console.log('Backend: Manually parsed body. New updateData:', updateData);
-            console.log('Backend: Type of updateData (after manual parse):', typeof updateData);
-            console.log('Backend: Keys of updateData (after manual parse):', Object.keys(updateData));
         } catch (parseError) {
-            console.error('Backend: Failed to manually parse body (likely invalid JSON or empty body):', parseError);
-            // Return an error if parsing fails, as we can't process the request
+            console.error('Backend: Failed to manually parse body:', parseError);
             return res.status(400).json({ message: 'Invalid JSON body format or empty request body.' });
         }
     }
-    // --------------------------------------------------------
 
     try {
         let currentTracking = await Tracking.findById(id);
@@ -726,10 +690,6 @@ app.put('/api/admin/trackings/:id', authenticateAdmin, async (req, res) => {
             console.log(`Backend: Tracking record not found for ID: ${id}`);
             return res.status(404).json({ message: 'Tracking record not found.' });
         }
-
-        // The rest of your logic remains the same.
-        // The `for (const key of Object.keys(updateData))` loop will now
-        // operate on the correctly parsed JSON object.
 
         if (updateData.trackingId && updateData.trackingId !== currentTracking.trackingId) {
             const newTrackingId = updateData.trackingId;
@@ -841,8 +801,7 @@ app.delete('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, asy
         }
 
         const before = tracking.history.length;
-        // Corrected line: Use 'new' keyword for ObjectId
-        tracking.history.pull({ _id: new mongoose.Types.ObjectId(historyId) }); // <-- Fix is here!
+        tracking.history.pull({ _id: new mongoose.Types.ObjectId(historyId) });
 
         if (tracking.history.length === before) {
             return res.status(404).json({ message: 'History event not found with the provided ID.' });
@@ -857,7 +816,7 @@ app.delete('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, asy
         });
 
     } catch (error) {
-        console.error('Error deleting history event:', error); // Check your server logs for the exact error here!
+        console.error('Error deleting history event:', error);
         res.status(500).json({ message: 'Server error while deleting history event.', error: error.message });
     }
 });
@@ -867,31 +826,22 @@ app.delete('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, asy
 app.delete('/api/admin/trackings/:id', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
 
-    // Validate the format of the tracking ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ message: 'Invalid tracking ID format.' });
     }
 
     try {
-        // Use findByIdAndDelete directly.
-        // It returns the deleted document if found, null if not found.
-        const deletedTracking = await Tracking.findByIdAndDelete(id); // *** THIS IS THE KEY CHANGE ***
+        const deletedTracking = await Tracking.findByIdAndDelete(id);
 
         if (!deletedTracking) {
-            // If deletedTracking is null, it means no document with that _id was found and deleted.
             return res.status(404).json({ message: 'Tracking record not found.' });
         }
 
-        // Optional: Delete attached file if using cloud storage
-        // This logic now correctly runs only if the tracking record was found AND deleted.
         if (deletedTracking.attachedFileName) {
             console.log(`Placeholder: Would delete file: ${deletedTracking.attachedFileName}`);
-            // Implement your file deletion logic here (e.g., from AWS S3, Cloudinary, etc.)
-            // Example (pseudo-code): await deleteFileFromCloud(deletedTracking.attachedFileName);
         }
 
-        // If we reach here, the tracking was found and successfully deleted.
-        res.json({ success: true, message: 'Tracking deleted successfully!' }); // Added success: true for consistency with frontend
+        res.json({ success: true, message: 'Tracking deleted successfully!' });
 
     } catch (error) {
         console.error('Error deleting tracking:', error);
@@ -926,12 +876,10 @@ app.post('/api/admin/create-user', async (req, res) => {
 app.post('/api/login', async (req, res) => {
     console.log('--- RECEIVED LOGIN REQUEST ---');
     console.log('Request body BEFORE any custom parsing (from Express):', req.body);
-    console.log('Type of req.body BEFORE any custom parsing (from Express):', typeof req.body);
-    console.log('Is req.body an object and not null BEFORE any custom parsing (from Express)?', typeof req.body === 'object' && req.body !== null);
 
     let requestBody;
 
-    if (typeof req.body === 'object' && req.body !== null && !req.body.username && req.body instanceof Buffer) {
+    if (Buffer.isBuffer(req.body) || (typeof req.body === 'object' && req.body !== null && Object.keys(req.body).length === 0 && req.rawBody && req.rawBody instanceof Buffer)) {
         try {
             requestBody = JSON.parse(req.body.toString('utf8'));
             console.log('Request body AFTER manual .toString() and JSON.parse:', requestBody);
@@ -945,9 +893,6 @@ app.post('/api/login', async (req, res) => {
     }
 
     const { username, password } = requestBody;
-
-    console.log('Extracted username:', username);
-    console.log('Extracted password (first few chars):', password ? password.substring(0, 5) + '...' : 'null/undefined');
 
     if (!username || !password) {
         console.log('Login failed: Username or password missing');
@@ -984,6 +929,20 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+
+// Admin Route: Get all users
+app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
+    try {
+        console.log('Received GET /api/admin/users request.');
+        const users = await User.find({}).select('-password');
+        res.json(users);
+    } catch (error) {
+        console.error('Error fetching all users for admin:', error);
+        res.status(500).json({ message: 'Server error while fetching users.', error: error.message });
+    }
+});
+
+
 // This route requires multipart/form-data parsing via Multer.
 app.post('/api/admin/send-email', authenticateAdmin, upload.single('attachment'), async (req, res) => {
     console.log('\n--- Backend: Send Email Request Received ---');
@@ -995,202 +954,182 @@ app.post('/api/admin/send-email', authenticateAdmin, upload.single('attachment')
     } : 'No file attached');
 
     try {
-        // 1. Destructure values from req.body (matching frontend keys)
         const { recipientEmail, subject, message, trackingId } = req.body;
         const attachment = req.file;
 
-        // 2. Initial Validation (already fixed based on previous discussion)
         if (!recipientEmail || !subject || !message) {
             console.log('Validation failed: Recipient, Subject, and Message fields are required.');
             return res.status(400).json({ message: 'Recipient, Subject, and Message fields are required.' });
         }
 
-        // 3. Determine the final recipient email address
         let finalRecipientEmailAddress = recipientEmail;
-        let tracking = null; // Initialize tracking object
+        let tracking = null;
 
-        // Only attempt to fetch from DB if a trackingId was provided
         if (trackingId) {
             tracking = await Tracking.findOne({ trackingId: trackingId });
-            // If recipientEmail was empty from the form but trackingId exists and has an email, use it
             if (!finalRecipientEmailAddress && tracking && tracking.recipientEmail) {
                 finalRecipientEmailAddress = tracking.recipientEmail;
                 console.log(`Found recipient email from tracking ID: ${finalRecipientEmailAddress}`);
             }
         }
         
-        // Final check to ensure we have a recipient email address before trying to send
         if (!finalRecipientEmailAddress) {
             return res.status(400).json({ message: 'Recipient email address is required (either directly provided or linked to a tracking ID).' });
         }
 
-        // --- NODEMAILER SETUP (Your existing code) ---
         const transporter = nodemailer.createTransport({
-            service: 'gmail', // Or 'smtp', etc., based on your email provider
+            service: 'gmail',
             auth: {
-                user: process.env.EMAIL_USER, // Your Gmail email address
-                pass: process.env.EMAIL_PASS, // Your App Password for Gmail
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
             },
         });
 
-       // --- CONSTRUCTING THE HTML EMAIL CONTENT ---
-// Ensure 'tracking' object is available and populated before this block.
-// If no trackingId was selected or found, 'tracking' will be null, so provide fallbacks.
-const dynamicTrackingId = tracking ? tracking.trackingId || 'N/A' : 'N/A';
-const dynamicRecipientName = tracking ? tracking.recipientName || 'Customer' : 'Customer';
-const dynamicStatus = tracking ? tracking.status || 'N/A' : 'N/A';
+        const dynamicTrackingId = tracking ? tracking.trackingId || 'N/A' : 'N/A';
+        const dynamicRecipientName = tracking ? tracking.recipientName || 'Customer' : 'Customer';
+        const dynamicStatus = tracking ? tracking.status || 'N/A' : 'N/A';
 
-// Logic to determine the latest update timestamp and location from history or fallback
-let latestUpdateTimestamp = 'N/A';
-let latestUpdateLocation = tracking ? tracking.location || 'N/A' : 'N/A'; // Default to tracking.location
+        let latestUpdateTimestamp = 'N/A';
+        let latestUpdateLocation = tracking ? tracking.location || 'N/A' : 'N/A';
 
-if (tracking && tracking.history && tracking.history.length > 0) {
-    // Sort history to get the truly latest event by timestamp (descending)
-    const sortedHistory = [...tracking.history].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    const latestEvent = sortedHistory[0];
-    if (latestEvent) {
-        latestUpdateTimestamp = new Date(latestEvent.timestamp).toLocaleString();
-        latestUpdateLocation = latestEvent.location || latestUpdateLocation; // Use event location, fallback to general tracking location
-    }
-} else if (tracking && tracking.lastUpdated) {
-    latestUpdateTimestamp = new Date(tracking.lastUpdated).toLocaleString();
-} else {
-    latestUpdateTimestamp = new Date().toLocaleString(); // Fallback to current time if no tracking or history
-}
-
-// Ensure expectedDelivery is correctly formatted from the `expectedDelivery` field, not `expectedDeliveryDate`
-const dynamicExpectedDelivery = tracking && tracking.expectedDelivery
-    ? new Date(tracking.expectedDelivery).toLocaleDateString()
-    : 'N/A';
-
-const yourWebsiteBaseUrl = process.env.FRONTEND_URL || 'https://fedexs.onrender.com';
-
-// --- FIXED LOGO IMAGE URL ---
-const logoImageUrl = 'https://i.imgur.com/nShHzww.png'; // Direct link to the image
-
-const emailHtmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Shipment Update</title>
-        <style type="text/css">
-            body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
-            .container { width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-            .header { background-color: #350056ff; padding: 20px; text-align: center; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-            .logo { max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto; }
-            .content { padding: 20px; line-height: 1.6; color: #333; }
-            .footer { text-align: center; font-size: 12px; color: #777; padding: 20px; }
-            .status-box { background-color: #e0f2f7; padding: 15px; border-left: 5px solid #440279ff; margin-bottom: 20px; }
-            .status-box p { margin: 0; }
-            /* Original link style for comparison if needed, overridden by inline for button */
-            a { color: #0056b3; text-decoration: none; }
-            a:hover { text-decoration: underline; }
-
-            /* New style for the custom message box */
-            .message-section {
-                margin-top: 20px;
-                padding: 15px;
-                border: 1px solid #dcdcdc; /* Light gray border */
-                border-left: 4px solid #350056ff; /* Matches header color */
-                background-color: #f8f8f8; /* Very light gray background */
-                border-radius: 5px; /* Slightly rounded corners */
-                font-size: 14px;
-                line-height: 1.5;
-                color: #555;
+        if (tracking && tracking.history && tracking.history.length > 0) {
+            const sortedHistory = [...tracking.history].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            const latestEvent = sortedHistory[0];
+            if (latestEvent) {
+                latestUpdateTimestamp = new Date(latestEvent.timestamp).toLocaleString();
+                latestUpdateLocation = latestEvent.location || latestUpdateLocation;
             }
-            .message-section p {
-                margin: 0; /* Remove default paragraph margins inside the box */
-            }
-            .message-section strong {
-                color: #333; /* Make title bolder */
-            }
-        </style>
-    </head>
-    <body>
-        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4;">
-            <tr>
-                <td align="center" style="padding: 20px 0;">
-                    <table class="container" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
-                        <tr>
-                            <td class="header" style="background-color: #350056ff; padding: 20px; text-align: center; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px;">
-                                <img src="${logoImageUrl}" alt="FedEx Logo" class="logo" style="max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto;">
-                                <h2 style="color: white; margin: 0;">Shipment Update Notification</h2>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="content" style="padding: 20px; line-height: 1.6; color: #333;">
-                                <p style="margin-bottom: 10px;">Dear ${dynamicRecipientName},</p>
-                                <p style="margin-bottom: 10px;">This is an important update regarding your FedEx shipment.</p>
-                                
-                                <div class="status-box" style="background-color: #e0f2f7; padding: 15px; border-left: 5px solid #440279ff; margin-bottom: 20px;">
-                                    <p style="margin: 0; font-weight: bold;">Tracking ID: <span style="font-weight: normal;">${dynamicTrackingId}</span></p>
-                                    <p style="margin: 5px 0 0 0; font-weight: bold;">Current Status: <span style="font-weight: normal;">${dynamicStatus}</span></p>
-                                    <p style="margin: 5px 0 0 0; font-weight: bold;">Latest Update: <span style="font-weight: normal;">${latestUpdateTimestamp} at ${latestUpdateLocation}</span></p>
-                                    <p style="margin: 5px 0 0 0; font-weight: bold;">Expected Delivery: <span style="font-weight: normal;">${dynamicExpectedDelivery}</span></p>
-                                </div>
+        } else if (tracking && tracking.lastUpdated) {
+            latestUpdateTimestamp = new Date(tracking.lastUpdated).toLocaleString();
+        } else {
+            latestUpdateTimestamp = new Date().toLocaleString();
+        }
 
-                                <p style="margin-bottom: 10px;">You can track your package anytime by visiting our website: 
-                                    <a href="${yourWebsiteBaseUrl}" 
-                                       style="
-                                           display: inline-block; /* Makes padding work correctly */
-                                           background-color: #350056ff; /* Purple background */
-                                           color: #ffffff; /* White text */
-                                           padding: 10px 20px; /* Space around text */
-                                           text-decoration: none; /* Remove underline */
-                                           border-radius: 5px; /* Slightly rounded corners */
-                                           font-weight: bold; /* Make the text bold */
-                                       "
-                                    >Track My Package</a>
-                                </p>
+        const dynamicExpectedDelivery = tracking && tracking.expectedDelivery
+            ? new Date(tracking.expectedDelivery).toLocaleDateString()
+            : 'N/A';
 
-                                ${message ? `
-                                    <div class="message-section" style="
-                                        margin-top: 20px;
-                                        padding: 15px;
-                                        border: 1px solid #dcdcdc;
-                                        border-left: 4px solid #d2290fff; /* Matches header color */
-                                        background-color: #350056ff;
-                                        border-radius: 5px;
-                                        font-size: 14px;                             
-                                        line-height: 1.5;
-                                        color: #fffdfdff;
-                                    ">
-                                        <p style="margin: 0; font-weight: bold; color: #fffdfdff;">From FedEx Management:</p>
-                                        <p style="margin: 10px 0 0 0; padding: 0 5px;">"<i>${message}</i>"</p>
-                                    </div>
-                                ` : ''}
+        const yourWebsiteBaseUrl = process.env.FRONTEND_URL || 'https://fedexs.onrender.com';
+        const logoImageUrl = 'https://i.imgur.com/nShHzww.png';
 
-                                <p style="margin-top: 20px;">Thank you for choosing FedEx for your shipping needs.</p>
-                                <p style="margin-bottom: 0;">Sincerely,</p>
-                                <p style="margin-top: 5px;">The FedEx Team</p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="footer" style="text-align: center; font-size: 12px; color: #777; padding: 20px;">
-                                <p style="margin: 0;">&copy; ${new Date().getFullYear()} FedEx. All rights reserved.</p>
-                                <p style="margin: 5px 0 0 0;">This is an automated email, please do not reply.</p>
-                            </td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-        </table>
-    </body>
-    </html>
-`;
-        // --- EMAIL OPTIONS (Nodemailer) ---
+        const emailHtmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>Shipment Update</title>
+                <style type="text/css">
+                    body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+                    .container { width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+                    .header { background-color: #350056ff; padding: 20px; text-align: center; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; }
+                    .logo { max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto; }
+                    .content { padding: 20px; line-height: 1.6; color: #333; }
+                    .footer { text-align: center; font-size: 12px; color: #777; padding: 20px; }
+                    .status-box { background-color: #e0f2f7; padding: 15px; border-left: 5px solid #440279ff; margin-bottom: 20px; }
+                    .status-box p { margin: 0; }
+                    a { color: #0056b3; text-decoration: none; }
+                    a:hover { text-decoration: underline; }
+                    .message-section {
+                        margin-top: 20px;
+                        padding: 15px;
+                        border: 1px solid #dcdcdc;
+                        border-left: 4px solid #d2290fff;
+                        background-color: #350056ff;
+                        border-radius: 5px;
+                        font-size: 14px;
+                        line-height: 1.5;
+                        color: #fffdfdff;
+                    }
+                    .message-section p {
+                        margin: 0;
+                    }
+                    .message-section strong {
+                        color: #fffdfdff;
+                    }
+                </style>
+            </head>
+            <body>
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4;">
+                    <tr>
+                        <td align="center" style="padding: 20px 0;">
+                            <table class="container" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                                <tr>
+                                    <td class="header" style="background-color: #350056ff; padding: 20px; text-align: center; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+                                        <img src="${logoImageUrl}" alt="FedEx Logo" class="logo" style="max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto;">
+                                        <h2 style="color: white; margin: 0;">Shipment Update Notification</h2>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="content" style="padding: 20px; line-height: 1.6; color: #333;">
+                                        <p style="margin-bottom: 10px;">Dear ${dynamicRecipientName},</p>
+                                        <p style="margin-bottom: 10px;">This is an important update regarding your FedEx shipment.</p>
+                                        
+                                        <div class="status-box" style="background-color: #e0f2f7; padding: 15px; border-left: 5px solid #440279ff; margin-bottom: 20px;">
+                                            <p style="margin: 0; font-weight: bold;">Tracking ID: <span style="font-weight: normal;">${dynamicTrackingId}</span></p>
+                                            <p style="margin: 5px 0 0 0; font-weight: bold;">Current Status: <span style="font-weight: normal;">${dynamicStatus}</span></p>
+                                            <p style="margin: 5px 0 0 0; font-weight: bold;">Latest Update: <span style="font-weight: normal;">${latestUpdateTimestamp} at ${latestUpdateLocation}</span></p>
+                                            <p style="margin: 5px 0 0 0; font-weight: bold;">Expected Delivery: <span style="font-weight: normal;">${dynamicExpectedDelivery}</span></p>
+                                        </div>
+
+                                        <p style="margin-bottom: 10px;">You can track your package anytime by visiting our website: 
+                                            <a href="${yourWebsiteBaseUrl}"
+                                                style="
+                                                    display: inline-block;
+                                                    background-color: #350056ff;
+                                                    color: #ffffff;
+                                                    padding: 10px 20px;
+                                                    text-decoration: none;
+                                                    border-radius: 5px;
+                                                    font-weight: bold;
+                                                "
+                                            >Track My Package</a>
+                                        </p>
+
+                                        ${message ? `
+                                            <div class="message-section" style="
+                                                margin-top: 20px;
+                                                padding: 15px;
+                                                border: 1px solid #dcdcdc;
+                                                border-left: 4px solid #d2290fff;
+                                                background-color: #350056ff;
+                                                border-radius: 5px;
+                                                font-size: 14px;
+                                                line-height: 1.5;
+                                                color: #fffdfdff;
+                                            ">
+                                                <p style="margin: 0; font-weight: bold; color: #fffdfdff;">From FedEx Management:</p>
+                                                <p style="margin: 10px 0 0 0; padding: 0 5px;">"<i>${message}</i>"</p>
+                                            </div>
+                                        ` : ''}
+
+                                        <p style="margin-top: 20px;">Thank you for choosing FedEx for your shipping needs.</p>
+                                        <p style="margin-bottom: 0;">Sincerely,</p>
+                                        <p style="margin-top: 5px;">The FedEx Team</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="footer" style="text-align: center; font-size: 12px; color: #777; padding: 20px;">
+                                        <p style="margin: 0;">&copy; ${new Date().getFullYear()} FedEx. All rights reserved.</p>
+                                        <p style="margin: 5px 0 0 0;">This is an automated email, please do not reply.</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
+        `;
+
         const mailOptions = {
-            from: `"FedEx Delivery Service" <${process.env.EMAIL_USER}>`, // Now it will show "FedEx Delivery Service" as the sender name
+            from: `"FedEx Delivery Service" <${process.env.EMAIL_USER}>`,
             to: finalRecipientEmailAddress,
             subject: subject,
-            html: emailHtmlContent, // <-- Use the generated HTML here
-            // Plain text version - crucial for email clients that don't render HTML, or for accessibility
+            html: emailHtmlContent,
             text: `Dear ${dynamicRecipientName},\n\nYour shipment with tracking ID ${dynamicTrackingId} is currently "${dynamicStatus}".\n\nLatest update: ${new Date().toLocaleString()} at ${latestUpdateLocation}.\n\nExpected delivery: ${dynamicExpectedDelivery}.\n\n${message ? `Admin's message: ${message}\n\n` : ''}Thank you for choosing FedEx.\n\nTrack your package: ${yourWebsiteBaseUrl}/track?id=${dynamicTrackingId}`,
         };
 
-        // --- ATTACHMENT HANDLING (Your existing code) ---
         if (attachment) {
             mailOptions.attachments = [{
                 filename: attachment.originalname,
@@ -1202,7 +1141,6 @@ const emailHtmlContent = `
             console.log('No attachment for this email.');
         }
 
-        // --- SEND THE EMAIL (Your existing code) ---
         console.log('Backend: Attempting to send email...');
         console.log('Backend: Mail options being used:', {
             from: mailOptions.from,
@@ -1212,18 +1150,15 @@ const emailHtmlContent = `
             textContentLength: mailOptions.text ? mailOptions.text.length : 'N/A',
             hasAttachment: mailOptions.attachments && mailOptions.attachments.length > 0 ? true : false
         });
-        console.log('Backend: Nodemailer transporter user (from env):', process.env.EMAIL_USER);
-        // !!! IMPORTANT: DO NOT LOG process.env.EMAIL_PASS DIRECTLY FOR SECURITY REASONS !!!
 
         const info = await transporter.sendMail(mailOptions);
         console.log('Email sent successfully!');
-        console.log('Nodemailer response (info object):', info); // This shows detailed response from Gmail/SMTP server
+        console.log('Nodemailer response (info object):', info);
 
         res.status(200).json({ success: true, message: 'Email sent successfully!' });
 
     } catch (error) {
         console.error('Error sending email:', error);
-        // Log more details about the Nodemailer error
         if (error.code) {
             console.error('Nodemailer error code (e.g., EAUTH):', error.code);
         }
@@ -1243,6 +1178,7 @@ const emailHtmlContent = `
         res.status(500).json({ success: false, message: error.message || 'Failed to send email.' });
     }
 });
+
 
 // --- Serve Static Files (IMPORTANT for Netlify Functions) ---
 app.use(express.static(path.join(__dirname, 'public')));
@@ -1266,6 +1202,12 @@ app.use((err, req, res, next) => {
         message: err.message || 'An unexpected server error occurred.',
         error: process.env.NODE_ENV === 'production' ? {} : err.stack
     });
+});
+
+// --- Start the Server ---
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
 
 
