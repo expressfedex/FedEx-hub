@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-   // --- Fetch Single Tracking Details for Update Form ---
+    // --- Fetch Single Tracking Details for Update Form ---
 if (singleTrackingIdSelect) {
     singleTrackingIdSelect.addEventListener('change', function() {
         // Get the value from the selected option
@@ -751,13 +751,14 @@ function fetchTrackingHistory(trackingId) { // Renamed parameter from mongoId to
     if (addHistoryForm) {
         addHistoryForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            const trackingMongoId = updateTrackingMongoId.value; // Get the ID of the currently selected tracking
+        const trackingMongoId = document.getElementById('historyTrackingIdInput').value;
 
-            const newHistoryEvent = {
-                timestamp: new Date(`${document.getElementById('newHistoryDate').value}T${document.getElementById('newHistoryTime').value}`).toISOString(),
-                location: document.getElementById('newHistoryLocation').value,
-                description: document.getElementById('newHistoryDescription').value
-            };
+        const newHistoryEvent = {
+    date: document.getElementById('newHistoryDate').value,
+    time: document.getElementById('newHistoryTime').value,
+    location: document.getElementById('newHistoryLocation').value,
+    description: document.getElementById('newHistoryDescription').value
+};
 
             fetch(`/api/admin/trackings/${trackingMongoId}/history`, {
                 method: 'POST',
@@ -798,52 +799,84 @@ function fetchTrackingHistory(trackingId) { // Renamed parameter from mongoId to
         });
     }
 
-    if (saveHistoryEditBtn) {
-        saveHistoryEditBtn.addEventListener('click', function() {
-            const trackingMongoId = editHistoryModalTrackingMongoId.value;
-            const historyId = editHistoryModalHistoryId.value;
+    // --- Fix for the Invalid Date Error ---
+if (saveHistoryEditBtn) {
+    saveHistoryEditBtn.addEventListener('click', function() {
+        const trackingMongoId = editHistoryModalTrackingMongoId.value;
+        const historyId = editHistoryModalHistoryId.value;
 
-            const updatedHistoryEvent = {
-                timestamp: new Date(`${editHistoryDate.value}T${editHistoryTime.value}`).toISOString(),
-                location: editHistoryLocation.value,
-                description: editHistoryDescription.value
-            };
+        // Get the Materialize Datepicker and Timepicker instances
+        const datepickerInstance = M.Datepicker.getInstance(editHistoryDate);
+        const timepickerInstance = M.Timepicker.getInstance(editHistoryTime);
 
-            fetch(`/api/admin/trackings/${trackingMongoId}/history/${historyId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify(updatedHistoryEvent)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
-                        M.toast({ html: 'Session expired or unauthorized. Please log in again.', classes: 'red darken-2' });
-                        setTimeout(() => window.location.href = 'admin_login.html', 2000);
-                    }
-                    return response.json().then(errorData => {
-                        throw new Error(errorData.message || 'Server error updating history event');
-                    });
+        let isoTimestamp = '';
+        if (datepickerInstance && datepickerInstance.date && timepickerInstance && timepickerInstance.time) {
+            // Get the date object from the datepicker
+            const date = datepickerInstance.date;
+            
+            // Get the time value and parse it
+            const [time, period] = timepickerInstance.time.split(' ');
+            let [hours, minutes] = time.split(':').map(Number);
+            
+            // Convert to 24-hour format
+            if (period === 'PM' && hours < 12) {
+                hours += 12;
+            }
+            if (period === 'AM' && hours === 12) {
+                hours = 0;
+            }
+
+            // Set the hours and minutes on the date object
+            date.setHours(hours, minutes, 0, 0);
+
+            // Format the final ISO string
+            isoTimestamp = date.toISOString();
+        } else {
+            M.toast({ html: 'Please select a valid date and time.', classes: 'red darken-2' });
+            return; // Stop execution if date/time is invalid or missing
+        }
+
+        const updatedHistoryEvent = {
+            timestamp: isoTimestamp,
+            location: editHistoryLocation.value,
+            description: editHistoryDescription.value
+        };
+
+        fetch(`/api/admin/trackings/${trackingMongoId}/history/${historyId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify(updatedHistoryEvent)
+        })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    M.toast({ html: 'Session expired or unauthorized. Please log in again.', classes: 'red darken-2' });
+                    setTimeout(() => window.location.href = 'admin_login.html', 2000);
                 }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    M.toast({ html: 'History event updated successfully!', classes: 'green darken-2' });
-                    M.Modal.getInstance(editHistoryModal).close();
-                    fetchTrackingHistory(trackingMongoId); // Refresh history list
-                } else {
-                    M.toast({ html: `Error: ${data.message || 'Could not update history event.'}`, classes: 'red darken-2' });
-                }
-            })
-            .catch(error => {
-                console.error('Error updating history event:', error);
-                M.toast({ html: `Network error or server issue: ${error.message}`, classes: 'red darken-2' });
-            });
+                return response.json().then(errorData => {
+                    throw new Error(errorData.message || 'Server error updating history event');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                M.toast({ html: 'History event updated successfully!', classes: 'green darken-2' });
+                M.Modal.getInstance(editHistoryModal).close();
+                fetchTrackingHistory(trackingMongoId); // Refresh history list
+            } else {
+                M.toast({ html: `Error: ${data.message || 'Could not update history event.'}`, classes: 'red darken-2' });
+            }
+        })
+        .catch(error => {
+            console.error('Error updating history event:', error);
+            M.toast({ html: `Network error or server issue: ${error.message}`, classes: 'red darken-2' });
         });
-    }
+    });
+}
 
     function deleteHistoryEvent(trackingMongoId, historyId) {
         fetch(`/api/admin/trackings/${trackingMongoId}/history/${historyId}`, {

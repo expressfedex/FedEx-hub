@@ -1,6 +1,4 @@
 // server.js - Your core Express application logic
-// This file defines the Express app, its middleware, routes, and Mongoose models.
-// It DOES NOT start the server (no app.listen) and handles database connection lazily.
 
 require('dotenv').config(); // Good for local development/testing
 
@@ -44,6 +42,13 @@ const upload = multer({
     }
 });
 
+// --- Start the Server ---
+// This is where you should place the new code block
+// The server won't start until this line is executed.
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
 
 // --- Mongoose Models ---
 // Your schema definitions here...
@@ -189,10 +194,18 @@ const authenticateAdmin = (req, res, next) => {
 // --- API Routes ---
 
 // Public endpoint to get tracking details
-app.get('/api/track/:trackingId', async (req, res) => {
+   app.get('/api/track/:trackingId', async (req, res) => {
     try {
         const trackingId = req.params.trackingId;
-        const trackingDetails = await Tracking.findOne({ trackingId: trackingId });
+        
+        // --- ADD THIS LINE ---
+        const numericId = parseInt(trackingId, 10);
+        if (isNaN(numericId)) {
+            return res.status(400).json({ message: 'Invalid Tracking ID format.' });
+        }
+
+        // Use the numeric ID in the query
+        const trackingDetails = await Tracking.findOne({ trackingId: numericId });
 
         if (!trackingDetails) {
             return res.status(404).json({ message: 'Tracking ID not found.' });
@@ -249,27 +262,55 @@ app.get('/api/admin/trackings', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Admin Route: Get a single tracking record by ID
-app.get('/api/admin/trackings/:id', authenticateAdmin, async (req, res) => {
+// Admin Route: Fetch history for a tracking
+app.get('/api/admin/trackings/:trackingIdValue/history', authenticateToken, async (req, res) => {
     try {
-        const { id } = req.params;
-        console.log(`Received GET /api/admin/trackings/${id} request.`);
+        const { trackingIdValue } = req.params;
 
-        const tracking = await Tracking.findById(id);
+        console.log('Backend: Fetching history for trackingIdValue:', trackingIdValue);
+        
+        // --- ADD THESE LINES ---
+        const numericId = parseInt(trackingIdValue, 10);
+        if (isNaN(numericId)) {
+            console.log('Backend: Invalid Tracking ID format for history fetch:', trackingIdValue);
+            return res.status(400).json({ message: 'Invalid Tracking ID format.' });
+        }
+
+        // Use the numeric ID in the query
+        const tracking = await Tracking.findOne({ trackingId: numericId });
 
         if (!tracking) {
+            console.log('Backend: Tracking record not found for custom ID (history fetch):', trackingIdValue);
             return res.status(404).json({ message: 'Tracking record not found.' });
         }
 
-        res.json(tracking); // Return the full tracking object for admin
+        res.json({ success: true, history: tracking.history || [] });
     } catch (error) {
-        console.error(`Error fetching single tracking ${req.params.id} for admin:`, error);
-        if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Invalid tracking ID format.' });
+        console.error('Error fetching tracking history:', error);
+        res.status(500).json({ message: 'Error fetching tracking history.' });
+    }
+});
+
+// Admin Route: Get a single tracking record by ID (Corrected to find by custom 'trackingId')
+app.get('/api/admin/trackings/:trackingIdValue', authenticateAdmin, async (req, res) => {
+    try {
+        const { trackingIdValue } = req.params;
+        console.log(`Backend: Received GET /api/admin/trackings/${trackingIdValue} request.`); // This will log the ID received by backend
+
+        const tracking = await Tracking.findOne({ trackingId: trackingIdValue });
+
+        if (!tracking) {
+            console.log(`Backend: Tracking record not found for custom ID: ${trackingIdValue}`); // This log means the ID wasn't found in DB
+            return res.status(404).json({ message: 'Tracking record not found.' }); // This is the exact message you're seeing
         }
+
+        res.json(tracking); // Returns the full tracking object
+    } catch (error) {
+        console.error(`Error fetching single tracking ${req.params.trackingIdValue} for admin:`, error);
         res.status(500).json({ message: 'Server error while fetching single tracking details.', error: error.message });
     }
 });
+
 
 // Admin Route: Get dashboard statistics
 app.get('/api/admin/dashboard-stats', authenticateAdmin, async (req, res) => {
@@ -442,12 +483,12 @@ function parseTimeWithAmPm(timeString) {
     return null;
 }
 
-
-// POST /api/admin/trackings/:id/history - Add a new history event to a tracking (Admin only)
-// This route is for JSON data, so existing parsing logic is fine.
-app.post('/api/admin/trackings/:id/history', authenticateAdmin, async (req, res) => {
+// POST /api/admin/trackings/:trackingIdValue/history - Add a new history event to a tracking (Admin only)
+app.post('/api/admin/trackings/:trackingIdValue/history', authenticateAdmin, async (req, res) => {
     console.log('\n--- Backend: Add History Event Request Received ---');
-    console.log('Backend: req.params.id (Tracking ID from URL):', req.params.id);
+    // Changed param name for clarity
+    const { trackingIdValue } = req.params;
+    console.log('Backend: req.params.trackingIdValue (Tracking ID from URL):', trackingIdValue);
     console.log('Backend: Full req.body received:', req.body);
 
     let bodyData = req.body;
@@ -480,11 +521,11 @@ app.post('/api/admin/trackings/:id/history', authenticateAdmin, async (req, res)
     }
 
     try {
-        const { id } = req.params;
-        const tracking = await Tracking.findById(id);
+        // --- CORRECTED LINE: Use findOne with the 'trackingId' field ---
+        const tracking = await Tracking.findOne({ trackingId: trackingIdValue });
 
         if (!tracking) {
-            console.log('Backend: Tracking record not found for ID:', id);
+            console.log('Backend: Tracking record not found for custom ID:', trackingIdValue);
             return res.status(404).json({ message: 'Tracking record not found.' });
         }
 
@@ -526,25 +567,47 @@ app.post('/api/admin/trackings/:id/history', authenticateAdmin, async (req, res)
 
         await tracking.save();
 
-        console.log('Backend: History event successfully added to tracking ID:', id);
-        res.status(201).json({ message: 'History event added successfully!', tracking: tracking.toObject(), newEvent: newHistoryEvent });
-
+        console.log('Backend: History event successfully added to tracking ID:', trackingIdValue);
+        res.status(201).json({ success: true, message: 'History event added successfully!', tracking: tracking.toObject(), newEvent: newHistoryEvent }); // Added success: true
     } catch (error) {
         console.error('Backend: Uncaught error adding history event:', error);
-        if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Invalid tracking ID format.' });
-        }
-        res.status(500).json({ message: 'Server error while adding history event.', error: error.message });
+        // CastError should no longer occur here for valid trackingIdValue
+        res.status(500).json({ success: false, message: 'Server error while adding history event.', error: error.message }); // Added success: false
     }
 });
-
 
 // Edit a specific history event
 app.put('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, async (req, res) => {
     const { id, historyId } = req.params;
-    const { date, time, location, description } = req.body; // This assumes JSON body, which is usually the case for PUT updates
+    let requestBody = req.body; // Use a temporary variable for req.body initially
+
+    // --- CRITICAL: MANUAL PARSING LOGIC TO ENSURE req.body IS A PARSED OBJECT ---
+    // (These are the lines that were missing from your previous logs)
+    console.log(`Backend: Received PUT request for History ID: ${historyId} on Tracking ID: ${id}`);
+    console.log('Backend: History Data to update (initial req.body):', req.body);
+    console.log('Backend: Type of requestBody (initial):', typeof requestBody);
+    console.log('Backend: Keys of requestBody (initial):', Object.keys(requestBody));
+
+    if (Buffer.isBuffer(requestBody)) {
+        try {
+            // Convert Buffer to string, then parse as JSON
+            const parsedBody = JSON.parse(requestBody.toString('utf8'));
+            requestBody = parsedBody; // Reassign requestBody to the parsed object
+            console.log('Backend: Manually parsed history body. New requestBody:', requestBody);
+            console.log('Backend: Type of requestBody (after manual parse):', typeof requestBody);
+            console.log('Backend: Keys of requestBody (after manual parse):', Object.keys(requestBody));
+        } catch (parseError) {
+            console.error('Backend: Failed to manually parse history body (likely invalid JSON or empty body):', parseError);
+            return res.status(400).json({ message: 'Invalid JSON body format or empty request body for history update.' });
+        }
+    }
+    // -----------------------------------------------------------------------------
+
+    // Now, destructure from the (potentially) parsed requestBody
+    const { date, time, location, description } = requestBody;
 
     if (date === undefined && time === undefined && location === undefined && description === undefined) {
+        console.log("Backend: Validation failed - no valid fields found in parsed body.");
         return res.status(400).json({ message: 'At least one field (date, time, location, or description) is required to update a history event.' });
     }
 
@@ -603,6 +666,7 @@ app.put('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, async 
 
         tracking.lastUpdated = new Date();
         await tracking.save();
+        console.log('Backend: History event updated successfully. New event:', historyEvent.toObject());
 
         res.json({ message: 'History event updated successfully!', historyEvent: historyEvent.toObject() });
     } catch (error) {
@@ -614,53 +678,81 @@ app.put('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, async 
     }
 });
 
+// Admin Route: Get all users
+app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
+    try {
+        console.log('Received GET /api/admin/users request.');
+        // Fetch all users from the database, but exclude their password for security
+        const users = await User.find({}).select('-password');
+        res.json(users);
+    } catch (error) {
+        console.error('Error fetching all users for admin:', error);
+        res.status(500).json({ message: 'Server error while fetching users.', error: error.message });
+    }
+});
 
 // Admin Route to Update Tracking Details (general updates, including trackingId change)
 app.put('/api/admin/trackings/:id', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
-    const updateData = req.body; // This route also assumes JSON body, not multipart/form-data.
+    let updateData = req.body; // Initialize updateData with the raw req.body
+
+    // --- IMPORTANT: ADD THIS MANUAL PARSING LOGIC HERE ---
+    console.log(`Backend: Received PUT request for MongoDB ID: ${id}`);
+    console.log('Backend: Data to update (initial req.body):', req.body);
+    console.log('Backend: Type of updateData (initial):', typeof updateData);
+    console.log('Backend: Keys of updateData (initial):', Object.keys(updateData));
+
+    // Check if req.body is a Buffer (as confirmed by your logs)
+    if (Buffer.isBuffer(updateData)) {
+        try {
+            // Attempt to parse the Buffer as a JSON string
+            const parsedBody = JSON.parse(updateData.toString('utf8'));
+            updateData = parsedBody; // Reassign updateData to the parsed object
+            console.log('Backend: Manually parsed body. New updateData:', updateData);
+            console.log('Backend: Type of updateData (after manual parse):', typeof updateData);
+            console.log('Backend: Keys of updateData (after manual parse):', Object.keys(updateData));
+        } catch (parseError) {
+            console.error('Backend: Failed to manually parse body (likely invalid JSON or empty body):', parseError);
+            // Return an error if parsing fails, as we can't process the request
+            return res.status(400).json({ message: 'Invalid JSON body format or empty request body.' });
+        }
+    }
+    // --------------------------------------------------------
 
     try {
         let currentTracking = await Tracking.findById(id);
 
         if (!currentTracking) {
+            console.log(`Backend: Tracking record not found for ID: ${id}`);
             return res.status(404).json({ message: 'Tracking record not found.' });
         }
 
+        // The rest of your logic remains the same.
+        // The `for (const key of Object.keys(updateData))` loop will now
+        // operate on the correctly parsed JSON object.
+
         if (updateData.trackingId && updateData.trackingId !== currentTracking.trackingId) {
             const newTrackingId = updateData.trackingId;
-
             const existingTrackingWithNewId = await Tracking.findOne({ trackingId: newTrackingId });
+
             if (existingTrackingWithNewId && String(existingTrackingWithNewId._id) !== id) {
                 return res.status(409).json({ message: 'New Tracking ID already exists. Please choose a different one.' });
             }
-            currentTracking.trackingId = newTrackingId;
+
             console.log(`Tracking ID changed from (old): ${currentTracking.trackingId} to (new): ${newTrackingId}`);
+            currentTracking.trackingId = newTrackingId;
         }
 
-        Object.keys(updateData).forEach(key => {
-            if (key === 'trackingId' || key === 'history' || key === '_id' || key === '__v' || updateData[key] === undefined) {
-                return;
-            }
-            if (key === 'recipientEmail') {
-                console.warn('Attempt to update recipientEmail via PUT /api/admin/trackings/:id ignored.');
-                return;
-            }
-
+        for (const key of Object.keys(updateData)) {
             if (key === 'expectedDeliveryDate') {
                 const effectiveDate = updateData.expectedDeliveryDate;
-                const effectiveTimeInput = updateData.expectedDeliveryTime || (currentTracking.expectedDelivery ? currentTracking.expectedDelivery.toISOString().split('T')[1].substring(0, 5) : '00:00');
+                const effectiveTimeInput = updateData.expectedDeliveryTime;
 
-                if (effectiveDate) {
-                    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-                    if (!dateRegex.test(effectiveDate)) {
-                        console.warn(`Invalid date format for expectedDeliveryDate: ${effectiveDate}`);
-                        return;
-                    }
+                if (effectiveDate && effectiveTimeInput) {
                     const parsedTime = parseTimeWithAmPm(effectiveTimeInput);
                     if (!parsedTime) {
-                        console.warn(`Could not parse expectedDeliveryTime for combined timestamp: ${effectiveTimeInput}`);
-                        return;
+                        console.warn(`Invalid time format for expectedDeliveryTime: ${effectiveTimeInput}`);
+                        continue;
                     }
 
                     const newExpectedDelivery = new Date(Date.UTC(
@@ -674,20 +766,23 @@ app.put('/api/admin/trackings/:id', authenticateAdmin, async (req, res) => {
                     if (!isNaN(newExpectedDelivery.getTime())) {
                         currentTracking.expectedDelivery = newExpectedDelivery;
                     } else {
-                        console.warn(`Could not parse new expectedDelivery with existing date: ${effectiveDate} ${effectiveTimeInput}`);
+                        console.warn(`Could not parse expectedDelivery: ${effectiveDate} ${effectiveTimeInput}`);
                     }
                 }
             } else if (key === 'expectedDeliveryTime') {
                 if (updateData.expectedDeliveryDate === undefined) {
-                    const effectiveDate = currentTracking.expectedDelivery ? currentTracking.expectedDelivery.toISOString().split('T')[0] : (new Date().toISOString().split('T')[0]);
-                    const effectiveTimeInput = updateData.expectedDeliveryTime;
+                    const effectiveDate = currentTracking.expectedDelivery
+                        ? currentTracking.expectedDelivery.toISOString().split('T')[0]
+                        : new Date().toISOString().split('T')[0];
 
+                    const effectiveTimeInput = updateData.expectedDeliveryTime;
                     if (effectiveTimeInput) {
                         const parsedTime = parseTimeWithAmPm(effectiveTimeInput);
                         if (!parsedTime) {
-                            console.warn(`Invalid time format for expectedDeliveryTime: ${effectiveTimeInput}`);
-                            return;
+                            console.warn(`Invalid time format: ${effectiveTimeInput}`);
+                            continue;
                         }
+
                         const newExpectedDelivery = new Date(Date.UTC(
                             new Date(effectiveDate).getUTCFullYear(),
                             new Date(effectiveDate).getUTCMonth(),
@@ -695,10 +790,11 @@ app.put('/api/admin/trackings/:id', authenticateAdmin, async (req, res) => {
                             parsedTime.hour,
                             parsedTime.minute
                         ));
+
                         if (!isNaN(newExpectedDelivery.getTime())) {
                             currentTracking.expectedDelivery = newExpectedDelivery;
                         } else {
-                            console.warn(`Could not parse new expectedDelivery with existing date: ${effectiveDate} ${effectiveTimeInput}`);
+                            console.warn(`Could not parse expectedDelivery: ${effectiveDate} ${effectiveTimeInput}`);
                         }
                     }
                 }
@@ -706,14 +802,16 @@ app.put('/api/admin/trackings/:id', authenticateAdmin, async (req, res) => {
                 currentTracking.isBlinking = typeof updateData[key] === 'boolean' ? updateData[key] : currentTracking.isBlinking;
             } else if (key === 'weight') {
                 currentTracking.weight = parseFloat(updateData.weight) || 0;
-            } else {
+            } else if (key !== 'trackingId') {
                 currentTracking[key] = updateData[key];
             }
-        });
+        }
 
         currentTracking.lastUpdated = new Date();
         await currentTracking.save();
-        res.json({ message: 'Tracking updated successfully!', tracking: currentTracking });
+        console.log('Backend: Successfully updated tracking. New data:', currentTracking);
+
+        res.json({ success: true, message: 'Tracking updated successfully!', tracking: currentTracking });
     } catch (error) {
         console.error('Error updating tracking details:', error);
         if (error.name === 'CastError') {
@@ -723,9 +821,18 @@ app.put('/api/admin/trackings/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
+
 // Delete a specific history event by _id
 app.delete('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, async (req, res) => {
     const { id, historyId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ message: 'Invalid tracking ID format.' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(historyId)) {
+        return res.status(400).json({ message: 'Invalid history ID format.' });
+    }
 
     try {
         const tracking = await Tracking.findById(id);
@@ -733,21 +840,24 @@ app.delete('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, asy
             return res.status(404).json({ message: 'Tracking record not found.' });
         }
 
-        const historyLengthBeforePull = tracking.history.length;
-        tracking.history.pull({ _id: historyId });
+        const before = tracking.history.length;
+        // Corrected line: Use 'new' keyword for ObjectId
+        tracking.history.pull({ _id: new mongoose.Types.ObjectId(historyId) }); // <-- Fix is here!
 
-        if (tracking.history.length === historyLengthBeforePull) {
+        if (tracking.history.length === before) {
             return res.status(404).json({ message: 'History event not found with the provided ID.' });
         }
 
         tracking.lastUpdated = new Date();
         await tracking.save();
-        res.json({ message: 'History event deleted successfully!', tracking });
+
+        res.json({
+            message: 'History event deleted successfully!',
+            history: tracking.history
+        });
+
     } catch (error) {
-        console.error('Error deleting history event:', error);
-        if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Invalid ID format for tracking or history event.' });
-        }
+        console.error('Error deleting history event:', error); // Check your server logs for the exact error here!
         res.status(500).json({ message: 'Server error while deleting history event.', error: error.message });
     }
 });
@@ -756,34 +866,36 @@ app.delete('/api/admin/trackings/:id/history/:historyId', authenticateAdmin, asy
 // Delete an entire tracking record
 app.delete('/api/admin/trackings/:id', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
+
+    // Validate the format of the tracking ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ message: 'Invalid tracking ID format.' });
+    }
+
     try {
-        const trackingToDelete = await Tracking.findById(id);
-        if (!trackingToDelete) {
+        // Use findByIdAndDelete directly.
+        // It returns the deleted document if found, null if not found.
+        const deletedTracking = await Tracking.findByIdAndDelete(id); // *** THIS IS THE KEY CHANGE ***
+
+        if (!deletedTracking) {
+            // If deletedTracking is null, it means no document with that _id was found and deleted.
             return res.status(404).json({ message: 'Tracking record not found.' });
         }
 
-        /*
-        // IMPORTANT: THIS SECTION NEEDS REFACTORING FOR CLOUD STORAGE (e.g., S3)
-        // If an attached file exists, delete it from the cloud storage (e.g., S3)
-        if (trackingToDelete.attachedFileName) {
-            // Example for S3 deletion (requires S3 SDK setup)
-            // const s3Key = trackingToDelete.attachedFileName;
-            // await s3.deleteObject({ Bucket: process.env.S3_BUCKET_NAME, Key: s3Key }).promise();
-            console.log(`Placeholder: Would delete file from cloud storage: ${trackingToDelete.attachedFileName}`);
+        // Optional: Delete attached file if using cloud storage
+        // This logic now correctly runs only if the tracking record was found AND deleted.
+        if (deletedTracking.attachedFileName) {
+            console.log(`Placeholder: Would delete file: ${deletedTracking.attachedFileName}`);
+            // Implement your file deletion logic here (e.g., from AWS S3, Cloudinary, etc.)
+            // Example (pseudo-code): await deleteFileFromCloud(deletedTracking.attachedFileName);
         }
-        */
 
-        const result = await Tracking.deleteOne({ _id: id });
-        if (result.deletedCount === 0) {
-            return res.status(404).json({ message: 'Tracking record not found.' });
-        }
-        res.json({ message: 'Tracking deleted successfully!' });
+        // If we reach here, the tracking was found and successfully deleted.
+        res.json({ success: true, message: 'Tracking deleted successfully!' }); // Added success: true for consistency with frontend
+
     } catch (error) {
         console.error('Error deleting tracking:', error);
-        if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Invalid tracking ID format.' });
-        }
-        res.status(500).json({ message: 'Error deleting tracking data.', error: error.message });
+        res.status(500).json({ success: false, message: 'Error deleting tracking data.', error: error.message });
     }
 });
 
@@ -872,7 +984,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// --- NEW: Email Sending Route (POST /api/admin/send-email) ---
 // This route requires multipart/form-data parsing via Multer.
 app.post('/api/admin/send-email', authenticateAdmin, upload.single('attachment'), async (req, res) => {
     console.log('\n--- Backend: Send Email Request Received ---');
@@ -881,41 +992,39 @@ app.post('/api/admin/send-email', authenticateAdmin, upload.single('attachment')
         originalname: req.file.originalname,
         mimetype: req.file.mimetype,
         size: req.file.size
-    } : 'No file attached'); // This log already shows if a file is attached or not.
+    } : 'No file attached');
 
     try {
-        const { to, subject, message, trackingId } = req.body;
-        const attachment = req.file; // This will be undefined if no file was uploaded, which is desired for optional.
+        // 1. Destructure values from req.body (matching frontend keys)
+        const { recipientEmail, subject, message, trackingId } = req.body;
+        const attachment = req.file;
 
-        // --- UPDATED VALIDATION HERE ---
-        // 'to', 'subject', and 'message' are the core required fields for sending an email.
-        // 'trackingId' is optional for the email sending process itself, used for convenience.
-        if (!to || !subject || !message) {
-            console.log('Validation failed: Recipient, Subject, and Message are required.');
-            return res.status(400).json({ message: 'Recipient, Subject, and Message are required.' });
+        // 2. Initial Validation (already fixed based on previous discussion)
+        if (!recipientEmail || !subject || !message) {
+            console.log('Validation failed: Recipient, Subject, and Message fields are required.');
+            return res.status(400).json({ message: 'Recipient, Subject, and Message fields are required.' });
         }
 
-        // Fetch tracking details to get recipient's email if 'to' is not provided directly
-        let recipientEmailAddress = to;
-        // Only attempt to fetch from DB if 'to' is empty AND a trackingId was provided
-        if (trackingId && !recipientEmailAddress) {
-            const tracking = await Tracking.findOne({ trackingId: trackingId });
-            if (tracking && tracking.recipientEmail) {
-                recipientEmailAddress = tracking.recipientEmail;
-                console.log(`Found recipient email from tracking ID: ${recipientEmailAddress}`);
-            } else {
-                console.warn(`Recipient email not provided and not found for tracking ID: ${trackingId}`);
-                // If trackingId was provided but no email found, or 'to' was also empty, this is an error
-                return res.status(400).json({ message: 'Recipient email address missing or not found for provided tracking ID.' });
+        // 3. Determine the final recipient email address
+        let finalRecipientEmailAddress = recipientEmail;
+        let tracking = null; // Initialize tracking object
+
+        // Only attempt to fetch from DB if a trackingId was provided
+        if (trackingId) {
+            tracking = await Tracking.findOne({ trackingId: trackingId });
+            // If recipientEmail was empty from the form but trackingId exists and has an email, use it
+            if (!finalRecipientEmailAddress && tracking && tracking.recipientEmail) {
+                finalRecipientEmailAddress = tracking.recipientEmail;
+                console.log(`Found recipient email from tracking ID: ${finalRecipientEmailAddress}`);
             }
         }
         
         // Final check to ensure we have a recipient email address before trying to send
-        if (!recipientEmailAddress) {
-            return res.status(400).json({ message: 'Recipient email address is required.' });
+        if (!finalRecipientEmailAddress) {
+            return res.status(400).json({ message: 'Recipient email address is required (either directly provided or linked to a tracking ID).' });
         }
 
-        // Nodemailer setup
+        // --- NODEMAILER SETUP (Your existing code) ---
         const transporter = nodemailer.createTransport({
             service: 'gmail', // Or 'smtp', etc., based on your email provider
             auth: {
@@ -924,19 +1033,168 @@ app.post('/api/admin/send-email', authenticateAdmin, upload.single('attachment')
             },
         });
 
-        // Email options
+       // --- CONSTRUCTING THE HTML EMAIL CONTENT ---
+// Ensure 'tracking' object is available and populated before this block.
+// If no trackingId was selected or found, 'tracking' will be null, so provide fallbacks.
+const dynamicTrackingId = tracking ? tracking.trackingId || 'N/A' : 'N/A';
+const dynamicRecipientName = tracking ? tracking.recipientName || 'Customer' : 'Customer';
+const dynamicStatus = tracking ? tracking.status || 'N/A' : 'N/A';
+
+// Logic to determine the latest update timestamp and location from history or fallback
+let latestUpdateTimestamp = 'N/A';
+let latestUpdateLocation = tracking ? tracking.location || 'N/A' : 'N/A'; // Default to tracking.location
+
+if (tracking && tracking.history && tracking.history.length > 0) {
+    // Sort history to get the truly latest event by timestamp (descending)
+    const sortedHistory = [...tracking.history].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const latestEvent = sortedHistory[0];
+    if (latestEvent) {
+        latestUpdateTimestamp = new Date(latestEvent.timestamp).toLocaleString();
+        latestUpdateLocation = latestEvent.location || latestUpdateLocation; // Use event location, fallback to general tracking location
+    }
+} else if (tracking && tracking.lastUpdated) {
+    latestUpdateTimestamp = new Date(tracking.lastUpdated).toLocaleString();
+} else {
+    latestUpdateTimestamp = new Date().toLocaleString(); // Fallback to current time if no tracking or history
+}
+
+// Ensure expectedDelivery is correctly formatted from the `expectedDelivery` field, not `expectedDeliveryDate`
+const dynamicExpectedDelivery = tracking && tracking.expectedDelivery
+    ? new Date(tracking.expectedDelivery).toLocaleDateString()
+    : 'N/A';
+
+const yourWebsiteBaseUrl = process.env.FRONTEND_URL || 'https://fedexs.onrender.com';
+
+// --- FIXED LOGO IMAGE URL ---
+const logoImageUrl = 'https://i.imgur.com/nShHzww.png'; // Direct link to the image
+
+const emailHtmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Shipment Update</title>
+        <style type="text/css">
+            body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+            .container { width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+            .header { background-color: #350056ff; padding: 20px; text-align: center; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; }
+            .logo { max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto; }
+            .content { padding: 20px; line-height: 1.6; color: #333; }
+            .footer { text-align: center; font-size: 12px; color: #777; padding: 20px; }
+            .status-box { background-color: #e0f2f7; padding: 15px; border-left: 5px solid #440279ff; margin-bottom: 20px; }
+            .status-box p { margin: 0; }
+            /* Original link style for comparison if needed, overridden by inline for button */
+            a { color: #0056b3; text-decoration: none; }
+            a:hover { text-decoration: underline; }
+
+            /* New style for the custom message box */
+            .message-section {
+                margin-top: 20px;
+                padding: 15px;
+                border: 1px solid #dcdcdc; /* Light gray border */
+                border-left: 4px solid #350056ff; /* Matches header color */
+                background-color: #f8f8f8; /* Very light gray background */
+                border-radius: 5px; /* Slightly rounded corners */
+                font-size: 14px;
+                line-height: 1.5;
+                color: #555;
+            }
+            .message-section p {
+                margin: 0; /* Remove default paragraph margins inside the box */
+            }
+            .message-section strong {
+                color: #333; /* Make title bolder */
+            }
+        </style>
+    </head>
+    <body>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4;">
+            <tr>
+                <td align="center" style="padding: 20px 0;">
+                    <table class="container" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                        <tr>
+                            <td class="header" style="background-color: #350056ff; padding: 20px; text-align: center; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+                                <img src="${logoImageUrl}" alt="FedEx Logo" class="logo" style="max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto;">
+                                <h2 style="color: white; margin: 0;">Shipment Update Notification</h2>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="content" style="padding: 20px; line-height: 1.6; color: #333;">
+                                <p style="margin-bottom: 10px;">Dear ${dynamicRecipientName},</p>
+                                <p style="margin-bottom: 10px;">This is an important update regarding your FedEx shipment.</p>
+                                
+                                <div class="status-box" style="background-color: #e0f2f7; padding: 15px; border-left: 5px solid #440279ff; margin-bottom: 20px;">
+                                    <p style="margin: 0; font-weight: bold;">Tracking ID: <span style="font-weight: normal;">${dynamicTrackingId}</span></p>
+                                    <p style="margin: 5px 0 0 0; font-weight: bold;">Current Status: <span style="font-weight: normal;">${dynamicStatus}</span></p>
+                                    <p style="margin: 5px 0 0 0; font-weight: bold;">Latest Update: <span style="font-weight: normal;">${latestUpdateTimestamp} at ${latestUpdateLocation}</span></p>
+                                    <p style="margin: 5px 0 0 0; font-weight: bold;">Expected Delivery: <span style="font-weight: normal;">${dynamicExpectedDelivery}</span></p>
+                                </div>
+
+                                <p style="margin-bottom: 10px;">You can track your package anytime by visiting our website: 
+                                    <a href="${yourWebsiteBaseUrl}" 
+                                       style="
+                                           display: inline-block; /* Makes padding work correctly */
+                                           background-color: #350056ff; /* Purple background */
+                                           color: #ffffff; /* White text */
+                                           padding: 10px 20px; /* Space around text */
+                                           text-decoration: none; /* Remove underline */
+                                           border-radius: 5px; /* Slightly rounded corners */
+                                           font-weight: bold; /* Make the text bold */
+                                       "
+                                    >Track My Package</a>
+                                </p>
+
+                                ${message ? `
+                                    <div class="message-section" style="
+                                        margin-top: 20px;
+                                        padding: 15px;
+                                        border: 1px solid #dcdcdc;
+                                        border-left: 4px solid #d2290fff; /* Matches header color */
+                                        background-color: #350056ff;
+                                        border-radius: 5px;
+                                        font-size: 14px;                             
+                                        line-height: 1.5;
+                                        color: #fffdfdff;
+                                    ">
+                                        <p style="margin: 0; font-weight: bold; color: #fffdfdff;">From FedEx Management:</p>
+                                        <p style="margin: 10px 0 0 0; padding: 0 5px;">"<i>${message}</i>"</p>
+                                    </div>
+                                ` : ''}
+
+                                <p style="margin-top: 20px;">Thank you for choosing FedEx for your shipping needs.</p>
+                                <p style="margin-bottom: 0;">Sincerely,</p>
+                                <p style="margin-top: 5px;">The FedEx Team</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="footer" style="text-align: center; font-size: 12px; color: #777; padding: 20px;">
+                                <p style="margin: 0;">&copy; ${new Date().getFullYear()} FedEx. All rights reserved.</p>
+                                <p style="margin: 5px 0 0 0;">This is an automated email, please do not reply.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+`;
+        // --- EMAIL OPTIONS (Nodemailer) ---
         const mailOptions = {
-            from: process.env.EMAIL_FROM, // Your sender email address (e.g., 'Your App <youremail@gmail.com>')
-            to: recipientEmailAddress,
+            from: `"FedEx Delivery Service" <${process.env.EMAIL_USER}>`, // Now it will show "FedEx Delivery Service" as the sender name
+            to: finalRecipientEmailAddress,
             subject: subject,
-            html: message, // Use 'html' if your message contains HTML, otherwise use 'text'
+            html: emailHtmlContent, // <-- Use the generated HTML here
+            // Plain text version - crucial for email clients that don't render HTML, or for accessibility
+            text: `Dear ${dynamicRecipientName},\n\nYour shipment with tracking ID ${dynamicTrackingId} is currently "${dynamicStatus}".\n\nLatest update: ${new Date().toLocaleString()} at ${latestUpdateLocation}.\n\nExpected delivery: ${dynamicExpectedDelivery}.\n\n${message ? `Admin's message: ${message}\n\n` : ''}Thank you for choosing FedEx.\n\nTrack your package: ${yourWebsiteBaseUrl}/track?id=${dynamicTrackingId}`,
         };
 
-        // --- ATTACHMENT HANDLING (ALREADY OPTIONAL AND CORRECT) ---
-        if (attachment) { // This condition correctly makes the attachment optional
+        // --- ATTACHMENT HANDLING (Your existing code) ---
+        if (attachment) {
             mailOptions.attachments = [{
                 filename: attachment.originalname,
-                content: attachment.buffer, // Use the buffer directly from multer's memory storage
+                content: attachment.buffer,
                 contentType: attachment.mimetype,
             }];
             console.log(`Attached file: ${attachment.originalname}, type: ${attachment.mimetype}, size: ${attachment.size} bytes`);
@@ -944,15 +1202,41 @@ app.post('/api/admin/send-email', authenticateAdmin, upload.single('attachment')
             console.log('No attachment for this email.');
         }
 
-        // Send the email
-        await transporter.sendMail(mailOptions);
+        // --- SEND THE EMAIL (Your existing code) ---
+        console.log('Backend: Attempting to send email...');
+        console.log('Backend: Mail options being used:', {
+            from: mailOptions.from,
+            to: mailOptions.to,
+            subject: mailOptions.subject,
+            htmlContentLength: mailOptions.html ? mailOptions.html.length : 'N/A',
+            textContentLength: mailOptions.text ? mailOptions.text.length : 'N/A',
+            hasAttachment: mailOptions.attachments && mailOptions.attachments.length > 0 ? true : false
+        });
+        console.log('Backend: Nodemailer transporter user (from env):', process.env.EMAIL_USER);
+        // !!! IMPORTANT: DO NOT LOG process.env.EMAIL_PASS DIRECTLY FOR SECURITY REASONS !!!
+
+        const info = await transporter.sendMail(mailOptions);
         console.log('Email sent successfully!');
+        console.log('Nodemailer response (info object):', info); // This shows detailed response from Gmail/SMTP server
 
         res.status(200).json({ success: true, message: 'Email sent successfully!' });
 
     } catch (error) {
         console.error('Error sending email:', error);
-        // Specifically check for Multer errors
+        // Log more details about the Nodemailer error
+        if (error.code) {
+            console.error('Nodemailer error code (e.g., EAUTH):', error.code);
+        }
+        if (error.response) {
+            console.error('Nodemailer error response (SMTP server response):', error.response);
+        }
+        if (error.responseCode) {
+            console.error('Nodemailer error response code (e.g., 535-7-8):', error.responseCode);
+        }
+        if (error.message) {
+            console.error('Nodemailer error message:', error.message);
+        }
+
         if (error instanceof multer.MulterError) {
             return res.status(400).json({ success: false, message: `File upload error: ${error.message}` });
         }
