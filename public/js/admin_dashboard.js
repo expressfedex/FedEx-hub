@@ -125,24 +125,39 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     sidebarLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const sectionId = this.dataset.section;
-            showSection(sectionId);
+    link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const sectionId = this.dataset.section;
 
-            // Fetch data specific to the section when navigating
-            if (sectionId === 'all-trackings-section') {
-                fetchAllTrackings();
-            } else if (sectionId === 'manage-tracking-section') {
-                fetchTrackingIdsForSelect(); // For the single tracking update dropdown
-            } else if (sectionId === 'communication-center-section') {
-                fetchTrackingIdsForEmailSelect(); // For email pre-fill
-                fetchTrackingIdsForAttachFileSelect(); // For file attachment
-            } else if (sectionId === 'user-management-section') {
-                fetchAllUsers();
-            }
-        });
+        // 🟢 DEBUG 1: Log the ID of the section being navigated to.
+        console.log(`Sidebar link clicked. Navigating to section: ${sectionId}`);
+
+        showSection(sectionId);
+
+        // Fetch data specific to the section when navigating
+        if (sectionId === 'all-trackings-section') {
+            // 🟢 DEBUG 2: Confirm that the all-trackings function is called.
+            console.log('Fetching all trackings for the all-trackings-section.');
+            fetchAllTrackings();
+        } else if (sectionId === 'manage-tracking-section') {
+            // 🟢 DEBUG 3: Confirm the functions for the manage-tracking section are called.
+            console.log('Fetching tracking IDs for dropdowns in manage-tracking-section.');
+            fetchTrackingIdsForSelect(); // For the single tracking update dropdown
+        } else if (sectionId === 'communication-center-section') {
+            // 🟢 DEBUG 4: Confirm the functions for the communication-center section are called.
+            console.log('Fetching tracking IDs for email and file attachment dropdowns.');
+            fetchTrackingIdsForEmailSelect(); // For email pre-fill
+            fetchTrackingIdsForAttachFileSelect(); // For file attachment
+        } else if (sectionId === 'user-management-section') {
+            // 🟢 DEBUG 5: Confirm that the all-users function is called.
+            console.log('Fetching all users for the user-management-section.');
+            fetchAllUsers();
+        } else {
+            // 🟢 DEBUG 6: Log if a clicked link does not have a corresponding fetch function.
+            console.log('No specific data-fetching function defined for this section.');
+        }
     });
+});
 
     // --- Date and Time Pickers ---
     M.Datepicker.init(document.querySelectorAll('.datepicker'), {
