@@ -48,10 +48,7 @@ if (!DB_URI) {
     process.exit(1); 
 }
 
-mongoose.connect(DB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
+mongoose.connect(DB_URI)
 .then(() => {
     console.log('Successfully connected to MongoDB.');
     // You can call your data population function here if needed
