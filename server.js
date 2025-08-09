@@ -283,20 +283,20 @@ app.get('/api/track/:trackingId', async (req, res) => {
 // Admin Route: Get all tracking records
 app.get('/api/admin/trackings', authenticateAdmin, async (req, res) => {
     try {
-        console.log('Received GET /api/admin/trackings request.');
+        console.log('Backend: Received GET /api/admin/trackings request.');
         const trackings = await Tracking.find({});
+        console.log(`Backend: Successfully fetched ${trackings.length} tracking records.`);
         res.json(trackings);
     } catch (error) {
-        console.error('Error fetching all trackings for admin:', error);
+        console.error('Backend: Error fetching all trackings for admin:', error);
         res.status(500).json({ message: 'Server error while fetching all trackings.', error: error.message });
     }
 });
-
+--------------------------------------------------------------------------------
 // Admin Route: Fetch history for a tracking
 app.get('/api/admin/trackings/:trackingIdValue/history', authenticateToken, async (req, res) => {
     try {
         const { trackingIdValue } = req.params;
-
         console.log('Backend: Fetching history for trackingIdValue:', trackingIdValue);
         
         const numericId = parseInt(trackingIdValue, 10);
@@ -314,27 +314,37 @@ app.get('/api/admin/trackings/:trackingIdValue/history', authenticateToken, asyn
 
         res.json({ success: true, history: tracking.history || [] });
     } catch (error) {
-        console.error('Error fetching tracking history:', error);
+        console.error('Backend: Error fetching tracking history:', error);
         res.status(500).json({ message: 'Error fetching tracking history.' });
     }
 });
-
+--------------------------------------------------------------------------------
 // Admin Route: Get a single tracking record by ID (Corrected to find by custom 'trackingId')
 app.get('/api/admin/trackings/:trackingIdValue', authenticateAdmin, async (req, res) => {
     try {
         const { trackingIdValue } = req.params;
         console.log(`Backend: Received GET /api/admin/trackings/${trackingIdValue} request.`);
+        
+        // 🟢 FIX: Convert the string parameter to a number to match the database schema.
+        const numericId = parseInt(trackingIdValue, 10);
+        console.log(`Backend: Converted trackingIdValue '${trackingIdValue}' to numeric ID: ${numericId}`);
 
-        const tracking = await Tracking.findOne({ trackingId: trackingIdValue });
+        if (isNaN(numericId)) {
+            console.log('Backend: Invalid Tracking ID format. Cannot parse to number.');
+            return res.status(400).json({ message: 'Invalid Tracking ID format.' });
+        }
+
+        const tracking = await Tracking.findOne({ trackingId: numericId });
 
         if (!tracking) {
-            console.log(`Backend: Tracking record not found for custom ID: ${trackingIdValue}`);
+            console.log(`Backend: Tracking record not found for numeric ID: ${numericId}`);
             return res.status(404).json({ message: 'Tracking record not found.' });
         }
 
+        console.log('Backend: Successfully found tracking record. Sending response.');
         res.json(tracking);
     } catch (error) {
-        console.error(`Error fetching single tracking ${req.params.trackingIdValue} for admin:`, error);
+        console.error(`Backend: Error fetching single tracking ${req.params.trackingIdValue} for admin:`, error);
         res.status(500).json({ message: 'Server error while fetching single tracking details.', error: error.message });
     }
 });
