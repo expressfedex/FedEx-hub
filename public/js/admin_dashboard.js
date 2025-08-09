@@ -447,10 +447,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Fetch Single Tracking Details for Update Form ---
+   // --- Fetch Single Tracking Details for Update Form ---
 if (singleTrackingIdSelect) {
+    // Correct event listener for Materialize CSS select element
     singleTrackingIdSelect.addEventListener('change', function() {
-        // Get the value from the selected option
         const trackingId = this.value;
 
         // CRITICAL FIX: Check explicitly for an invalid or empty tracking ID
@@ -458,14 +458,14 @@ if (singleTrackingIdSelect) {
             console.warn('No valid tracking ID selected. Hiding update form.');
             M.toast({ html: 'Please select a valid tracking ID.', classes: 'orange darken-2' });
             updateTrackingForm.style.display = 'none';
-            // Also clear the tracking history list to avoid showing old data
             document.getElementById('trackingHistoryList').innerHTML = '<ul class="collection"></ul>';
-            return; // Exit the function to prevent the API call
+            return;
         }
-
+        
         // Use the selected tracking ID to populate the hidden input for history management
         document.getElementById('historyTrackingIdInput').value = trackingId;
-
+        
+        // The fetch call itself is correct, but let's refine the logic.
         fetch(`/api/admin/trackings/${trackingId}`, {
             method: 'GET',
             headers: {
@@ -474,6 +474,7 @@ if (singleTrackingIdSelect) {
         })
         .then(response => {
             if (!response.ok) {
+                // ... (your existing error handling code is fine here) ...
                 if (response.status === 401 || response.status === 403) {
                     M.toast({ html: 'Session expired or unauthorized. Please log in again.', classes: 'red darken-2' });
                     setTimeout(() => window.location.href = 'admin_login.html', 2000);
@@ -499,22 +500,37 @@ if (singleTrackingIdSelect) {
             document.getElementById('updateServiceType').value = tracking.serviceType;
             document.getElementById('updateRecipientAddress').value = tracking.recipientAddress;
             document.getElementById('updateSpecialHandling').value = tracking.specialHandling || '';
-            document.getElementById('updateExpectedDeliveryDate').value = tracking.expectedDeliveryDate ? new Date(tracking.expectedDeliveryDate).toISOString().split('T')[0] : '';
-            document.getElementById('updateExpectedDeliveryTime').value = tracking.expectedDeliveryTime || '';
+            
+            // Handle date and time with a null check
+            const deliveryDate = tracking.expectedDelivery ? new Date(tracking.expectedDelivery) : null;
+            if (deliveryDate) {
+                document.getElementById('updateExpectedDeliveryDate').value = deliveryDate.toISOString().split('T')[0];
+                document.getElementById('updateExpectedDeliveryTime').value = deliveryDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            } else {
+                document.getElementById('updateExpectedDeliveryDate').value = '';
+                document.getElementById('updateExpectedDeliveryTime').value = '';
+            }
+            
             document.getElementById('updateOrigin').value = tracking.origin || '';
             document.getElementById('updateDestination').value = tracking.destination || '';
             document.getElementById('updateWeight').value = tracking.weight || '';
-
-            // Update Materialize elements and show the form
+            
+            // CRITICAL: Call M.updateTextFields() AFTER setting the values.
+            // This is essential for Materialize labels to float correctly.
             M.updateTextFields();
-            M.Datepicker.init(document.getElementById('updateExpectedDeliveryDate'));
-            M.Timepicker.init(document.getElementById('updateExpectedDeliveryTime'));
+            
+            // Re-initialize Materialize date and time pickers.
+            const datepickerInstance = M.Datepicker.init(document.getElementById('updateExpectedDeliveryDate'), {});
+            const timepickerInstance = M.Timepicker.init(document.getElementById('updateExpectedDeliveryTime'), {});
+
+            // Show the form
             updateTrackingForm.style.display = 'block';
 
-            // --- You must also handle the `historyTrackingIdInput` here ---
-            // This is the key part of the fix from our previous conversation.
+            // Use the valid tracking ID from the API response
             document.getElementById('historyTrackingIdInput').value = tracking.trackingId;
-            fetchTrackingHistory(tracking.trackingId); // Use the valid tracking ID from the API response
+            fetchTrackingHistory(tracking.trackingId); 
+            
+            M.toast({ html: 'Tracking details loaded!', classes: 'green darken-2' });
         })
         .catch(error => {
             console.error('Error fetching tracking details:', error);
@@ -523,7 +539,6 @@ if (singleTrackingIdSelect) {
         });
     });
 }
-
     // --- Update Tracking ---
     if (updateTrackingForm) {
         updateTrackingForm.addEventListener('submit', function(e) {
