@@ -448,6 +448,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
    // --- Fetch Single Tracking Details for Update Form ---
+
 if (singleTrackingIdSelect) {
     // Correct event listener for Materialize CSS select element
     singleTrackingIdSelect.addEventListener('change', function() {
@@ -474,7 +475,6 @@ if (singleTrackingIdSelect) {
         })
         .then(response => {
             if (!response.ok) {
-                // ... (your existing error handling code is fine here) ...
                 if (response.status === 401 || response.status === 403) {
                     M.toast({ html: 'Session expired or unauthorized. Please log in again.', classes: 'red darken-2' });
                     setTimeout(() => window.location.href = 'admin_login.html', 2000);
@@ -515,11 +515,9 @@ if (singleTrackingIdSelect) {
             document.getElementById('updateDestination').value = tracking.destination || '';
             document.getElementById('updateWeight').value = tracking.weight || '';
             
-            // CRITICAL: Call M.updateTextFields() AFTER setting the values.
-            // This is essential for Materialize labels to float correctly.
             M.updateTextFields();
             
-            // Re-initialize Materialize date and time pickers.
+             // Re-initialize Materialize date and time pickers.
             const datepickerInstance = M.Datepicker.init(document.getElementById('updateExpectedDeliveryDate'), {});
             const timepickerInstance = M.Timepicker.init(document.getElementById('updateExpectedDeliveryTime'), {});
 
