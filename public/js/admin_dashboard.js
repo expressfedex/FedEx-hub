@@ -448,44 +448,55 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
    // --- Fetch Single Tracking Details for Update Form ---
-
 if (singleTrackingIdSelect) {
     // Correct event listener for Materialize CSS select element
     singleTrackingIdSelect.addEventListener('change', function() {
-        const trackingId = this.value;
+        // This is the MongoDB ID of the selected option
+        const selectedMongoId = this.value;
+
+        // 🟢 DEBUG LOG 1: Check if a tracking ID was selected.
+        // FIX: Use the correct variable name `selectedMongoId` here.
+        console.log('Dropdown value changed. Selected MongoDB ID:', selectedMongoId);
 
         // CRITICAL FIX: Check explicitly for an invalid or empty tracking ID
-        if (!trackingId || trackingId === "") {
+        if (!selectedMongoId || selectedMongoId === "") {
             console.warn('No valid tracking ID selected. Hiding update form.');
             M.toast({ html: 'Please select a valid tracking ID.', classes: 'orange darken-2' });
             updateTrackingForm.style.display = 'none';
             document.getElementById('trackingHistoryList').innerHTML = '<ul class="collection"></ul>';
             return;
         }
-        
+
         // Use the selected tracking ID to populate the hidden input for history management
-        document.getElementById('historyTrackingIdInput').value = trackingId;
-        
+        document.getElementById('historyTrackingIdInput').value = selectedMongoId;
+
         // The fetch call itself is correct, but let's refine the logic.
-        fetch(`/api/admin/trackings/${trackingId}`, {
+        fetch(`/api/admin/trackings/${selectedMongoId}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         })
         .then(response => {
+            // 🟢 DEBUG LOG 2: Check the API response status.
+            console.log('API response status for fetching details:', response.status);
             if (!response.ok) {
                 if (response.status === 401 || response.status === 403) {
                     M.toast({ html: 'Session expired or unauthorized. Please log in again.', classes: 'red darken-2' });
                     setTimeout(() => window.location.href = 'admin_login.html', 2000);
                 }
                 return response.json().then(errorData => {
+                    // 🟢 DEBUG LOG 3: Log the detailed error from the server.
+                    console.error('Server error response data:', errorData);
                     throw new Error(errorData.message || 'Server error fetching tracking details');
                 });
             }
             return response.json();
         })
         .then(tracking => {
+            // 🟢 DEBUG LOG 4: Log the full data object received from the API.
+            console.log('Successfully fetched tracking details:', tracking);
+
             // Populate form fields with data from the fetched tracking object
             document.getElementById('updateTrackingMongoId').value = tracking._id;
             document.getElementById('updateTrackingId').value = tracking.trackingId;
@@ -500,7 +511,7 @@ if (singleTrackingIdSelect) {
             document.getElementById('updateServiceType').value = tracking.serviceType;
             document.getElementById('updateRecipientAddress').value = tracking.recipientAddress;
             document.getElementById('updateSpecialHandling').value = tracking.specialHandling || '';
-            
+
             // Handle date and time with a null check
             const deliveryDate = tracking.expectedDelivery ? new Date(tracking.expectedDelivery) : null;
             if (deliveryDate) {
@@ -510,14 +521,18 @@ if (singleTrackingIdSelect) {
                 document.getElementById('updateExpectedDeliveryDate').value = '';
                 document.getElementById('updateExpectedDeliveryTime').value = '';
             }
-            
+
             document.getElementById('updateOrigin').value = tracking.origin || '';
             document.getElementById('updateDestination').value = tracking.destination || '';
             document.getElementById('updateWeight').value = tracking.weight || '';
-            
+
+            // 🟢 DEBUG LOG 5: Log the value of the `updateTrackingId` input field *after* it has been populated.
+            console.log('Value of updateTrackingId input after population:', document.getElementById('updateTrackingId').value);
+
+            // Important for Materialize to handle dynamic content
             M.updateTextFields();
-            
-             // Re-initialize Materialize date and time pickers.
+
+            // Re-initialize Materialize date and time pickers.
             const datepickerInstance = M.Datepicker.init(document.getElementById('updateExpectedDeliveryDate'), {});
             const timepickerInstance = M.Timepicker.init(document.getElementById('updateExpectedDeliveryTime'), {});
 
@@ -526,8 +541,8 @@ if (singleTrackingIdSelect) {
 
             // Use the valid tracking ID from the API response
             document.getElementById('historyTrackingIdInput').value = tracking.trackingId;
-            fetchTrackingHistory(tracking.trackingId); 
-            
+            fetchTrackingHistory(tracking.trackingId);
+
             M.toast({ html: 'Tracking details loaded!', classes: 'green darken-2' });
         })
         .catch(error => {
@@ -537,67 +552,83 @@ if (singleTrackingIdSelect) {
         });
     });
 }
-    // --- Update Tracking ---
-    if (updateTrackingForm) {
-        updateTrackingForm.addEventListener('submit', function(e) {
-            e.preventDefault();
 
-            const mongoId = updateTrackingMongoId.value;
-            const updatedData = {
-                status: updateStatusInput.value,
-                isBlinking: updateIsBlinkingOriginal.checked,
-                statusLineColor: document.getElementById('updateStatusLineColor').value,
-                blinkingDotColor: document.getElementById('updateBlinkingDotColor').value,
-                senderName: document.getElementById('updateSenderName').value,
-                recipientName: document.getElementById('updateRecipientName').value,
-                recipientEmail: document.getElementById('updateRecipientEmail').value,
-                packageContents: document.getElementById('updatePackageContents').value,
-                serviceType: document.getElementById('updateServiceType').value,
-                recipientAddress: document.getElementById('updateRecipientAddress').value,
-                specialHandling: document.getElementById('updateSpecialHandling').value,
-                expectedDeliveryDate: document.getElementById('updateExpectedDeliveryDate').value,
-                expectedDeliveryTime: document.getElementById('updateExpectedDeliveryTime').value,
-                origin: document.getElementById('updateOrigin').value,
-                destination: document.getElementById('updateDestination').value,
-                weight: parseFloat(document.getElementById('updateWeight').value)
-            };
+   // --- Update Tracking ---
+if (updateTrackingForm) {
+    updateTrackingForm.addEventListener('submit', function(e) {
+        e.preventDefault();
 
-            fetch(`/api/admin/trackings/${mongoId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify(updatedData)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
-                        M.toast({ html: 'Session expired or unauthorized. Please log in again.', classes: 'red darken-2' });
-                        setTimeout(() => window.location.href = 'admin_login.html', 2000);
-                    }
-                    return response.json().then(errorData => {
-                        throw new Error(errorData.message || 'Server error updating tracking');
-                    });
+        const mongoId = updateTrackingMongoId.value;
+
+        // 🟢 DEBUG LINE 1: Log the MongoDB ID being used.
+        console.log('Attempting to update tracking with MongoDB ID:', mongoId);
+
+        const updatedData = {
+            status: updateStatusInput.value,
+            isBlinking: updateIsBlinkingOriginal.checked,
+            statusLineColor: document.getElementById('updateStatusLineColor').value,
+            blinkingDotColor: document.getElementById('updateBlinkingDotColor').value,
+            senderName: document.getElementById('updateSenderName').value,
+            recipientName: document.getElementById('updateRecipientName').value,
+            recipientEmail: document.getElementById('updateRecipientEmail').value,
+            packageContents: document.getElementById('updatePackageContents').value,
+            serviceType: document.getElementById('updateServiceType').value,
+            recipientAddress: document.getElementById('updateRecipientAddress').value,
+            specialHandling: document.getElementById('updateSpecialHandling').value,
+            expectedDeliveryDate: document.getElementById('updateExpectedDeliveryDate').value,
+            expectedDeliveryTime: document.getElementById('updateExpectedDeliveryTime').value,
+            origin: document.getElementById('updateOrigin').value,
+            destination: document.getElementById('updateDestination').value,
+            weight: parseFloat(document.getElementById('updateWeight').value)
+        };
+
+        // 🟢 DEBUG LINE 2: Log the full data payload being sent to the API.
+        console.log('Data payload for update:', updatedData);
+
+        fetch(`/api/admin/trackings/${mongoId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify(updatedData)
+        })
+        .then(response => {
+            // 🟢 DEBUG LINE 3: Log the status of the API response.
+            console.log('API response status for PUT request:', response.status);
+
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    M.toast({ html: 'Session expired or unauthorized. Please log in again.', classes: 'red darken-2' });
+                    setTimeout(() => window.location.href = 'admin_login.html', 2000);
                 }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    M.toast({ html: 'Tracking updated successfully!', classes: 'green darken-2' });
-                    fetchAllTrackings(); // Refresh all trackings table and dashboard stats
-                    fetchTrackingIdsForSelect(); // Refresh dropdown
-                    updateTrackingForm.style.display = 'none'; // Hide the form after update
-                } else {
-                    M.toast({ html: `Error: ${data.message || 'Could not update tracking.'}`, classes: 'red darken-2' });
-                }
-            })
-            .catch(error => {
-                console.error('Error updating tracking:', error);
-                M.toast({ html: `Network error or server issue: ${error.message}`, classes: 'red darken-2' });
-            });
+                return response.json().then(errorData => {
+                    // 🟢 DEBUG LINE 4: Log the error details from the server.
+                    console.error('Server error response data:', errorData);
+                    throw new Error(errorData.message || 'Server error updating tracking');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // 🟢 DEBUG LINE 5: Log the successful data received from the server.
+            console.log('Successful update response data:', data);
+
+            if (data.success) {
+                M.toast({ html: 'Tracking updated successfully!', classes: 'green darken-2' });
+                fetchAllTrackings();
+                fetchTrackingIdsForSelect();
+                updateTrackingForm.style.display = 'none';
+            } else {
+                M.toast({ html: `Error: ${data.message || 'Could not update tracking.'}`, classes: 'red darken-2' });
+            }
+        })
+        .catch(error => {
+            console.error('Error updating tracking:', error);
+            M.toast({ html: `Network error or server issue: ${error.message}`, classes: 'red darken-2' });
         });
-    }
+    });
+}
 
  // --- Delete Tracking ---
 function deleteTracking(trackingId) {
