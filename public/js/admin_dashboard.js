@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update Tracking Form Elements
     const singleTrackingIdSelect = document.getElementById('singleTrackingIdSelect');
+    console.log('Single tracking select element found:', singleTrackingIdSelect);
     const updateTrackingForm = document.getElementById('updateTrackingForm');
     const updateTrackingMongoId = document.getElementById('updateTrackingMongoId');
     const updateTrackingId = document.getElementById('updateTrackingId');
